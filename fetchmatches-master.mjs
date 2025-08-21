@@ -19,7 +19,7 @@ TELEGRAM_BOT_TOKEN=...
 TELEGRAM_CHAT_ID=...
 SEASON_ID=19
 RV_ID=134453
-MATCH_REFFERRER_URL=https://matchcentre.kncb.nl/matches/
+MATCH_REFERRER_URL=https://matchcentre.kncb.nl/matches/
 GRADES_REFERRER_URL=https://matchcentre.kncb.nl/matches/
 SEASONS_REFERRER_URL=https://matchcentre.kncb.nl/seasons/
 API_URL=https://api.resultsvault.co.uk/rv/134453/?apiid=1002
@@ -35,7 +35,6 @@ GRADE_IDS=73942,73943    # optioneel
 
 const {
   // referrers (let op typo 'REFFERRER' → we ondersteunen beide keys)
-  MATCH_REFFERRER_URL,
   MATCH_REFERRER_URL,
   GRADES_REFERRER_URL,
   SEASONS_REFERRER_URL,
@@ -148,7 +147,6 @@ function extractArray(any) {
 function pickReferrer() {
   // volgorde: expliciete referrers → fallback naar matches/
   const candidates = [
-    MATCH_REFFERRER_URL,
     MATCH_REFERRER_URL,
     GRADES_REFERRER_URL,
     SEASONS_REFERRER_URL,
