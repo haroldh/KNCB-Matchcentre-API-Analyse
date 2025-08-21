@@ -19,9 +19,9 @@ logs
 *.log.*
 
 # keys
-.*credentials.json
-*credentials.json
-*credentials*.json
+.gcredentials.json
+.*.*credentials.json
+*.*credentials*.json
 
 # Editor directories and files
 .vscode/
