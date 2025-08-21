@@ -1,0 +1,73 @@
+name: Fetch KNCB matches & update Sheets
+
+on:
+  workflow_dispatch: {}             # handmatig starten
+  schedule:
+    - cron: "25 05 * * *"          # elke dag 05:25 UTC (07:25 NL-tijd in zomer)
+
+permissions:
+  id-token: write                   # nodig voor OIDC
+  contents: read
+
+concurrency:
+  group: fetch-kncb
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    env:
+      # Niet-gevoelige vars uit GitHub "Actions > Variables"
+      SEASON_ID: ${{ vars.SEASON_ID }}
+      RV_ID: ${{ vars.RV_ID }}
+      MATCH_REFFERRER_URL: ${{ vars.MATCH_REFFERRER_URL }}
+      GRADES_REFERRER_URL: ${{ vars.GRADES_REFERRER_URL }}
+      SEASONS_REFERRER_URL: ${{ vars.SEASONS_REFERRER_URL }}
+      API_URL: ${{ vars.API_URL }}
+      MATCH_JSON_API_ENDPOINT: ${{ vars.MATCH_JSON_API_ENDPOINT }}
+      GRADES_JSON_API_ENDPOINT: ${{ vars.GRADES_JSON_API_ENDPOINT }}
+      SEASONS_JSON_API_ENDPOINT: ${{ vars.SEASONS_JSON_API_ENDPOINT }}
+      CSV_OUTPUT: ${{ vars.CSV_OUTPUT }}
+      GRADE_IDS: ${{ vars.GRADE_IDS }}
+      VERBOSE: ${{ vars.VERBOSE }}
+
+      # Gevoelige secrets
+      SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Auth to Google via OIDC (WIF)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          token_format: 'access_token' # geschikt voor googleapis
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run fetch script
+        run: node fetchmatches-master.mjs
+
+      # (Optioneel) Upload CSV-artefacten uit de repo root
+      - name: Upload CSV artifacts (per-grade + MASTER)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kncb-csv-${{ github.run_number }}
+          path: |
+            MASTER.csv
+            Grade_*.csv
+            ${{ env.CSV_OUTPUT }}
+          if-no-files-found: ignore
