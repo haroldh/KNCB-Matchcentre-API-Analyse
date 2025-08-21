@@ -19,7 +19,7 @@ TELEGRAM_BOT_TOKEN=...
 TELEGRAM_CHAT_ID=...
 SEASON_ID=19
 RV_ID=134453
-MATCH_REFERRER_URL=https://matchcentre.kncb.nl/matches/
+MATCH_REFFERRER_URL=https://matchcentre.kncb.nl/matches/
 GRADES_REFERRER_URL=https://matchcentre.kncb.nl/matches/
 SEASONS_REFERRER_URL=https://matchcentre.kncb.nl/seasons/
 API_URL=https://api.resultsvault.co.uk/rv/134453/?apiid=1002
