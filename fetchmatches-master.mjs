@@ -59,6 +59,8 @@ const {
 
 const SLOWDOWN_MS = Number(process.env.SLOWDOWN_MS ?? 1200);
 const TIMEOUT_MS  = Number(process.env.PUPPETEER_TIMEOUT_MS ?? 30000);
+const VERBOSE = Number(process.env.VERBOSE ?? 0);
+
 
 // ---------- Telegram (zonder parse_mode) ----------
 async function notifyTelegram(text) {
@@ -196,6 +198,28 @@ function buildMatchUrl(baseUrl, { gradeId, seasonId }) {
   return u.toString();
 }
 
+function getGradeId(g) {
+  // Probeer meerdere varianten
+  const candidates = [
+    g?.gradeId, g?.gradeID, g?.gradeid,
+    g?.id, g?.Id, g?.ID,
+    g?.grade?.id, g?.grade?.gradeId, g?.GradeId
+  ];
+  for (const c of candidates) {
+    if (c != null && String(c).trim() !== '') return String(c).trim();
+  }
+  return '';
+}
+
+function getSeasonIdFromGrade(g) {
+  const candidates = [g?.seasonid, g?.seasonId, g?.season?.id];
+  for (const c of candidates) {
+    if (c != null && String(c).trim() !== '') return String(c).trim();
+  }
+  return '';
+}
+
+
 async function pageFetchJson(page, url) {
   const result = await page.evaluate(async (u) => {
     try {
@@ -268,20 +292,70 @@ async function pageFetchJson(page, url) {
     const gradesArrRaw = extractArray(gradesJson) || [];
     console.log(`▶ Gevonden ${gradesArrRaw.length} raw grades`);
 
+if (VERBOSE >= 1) {
+  console.log('🧪 Voorbeeld grade[0..2]:');
+  gradesArrRaw.slice(0, 3).forEach((g, i) => {
+    console.log(`grade[${i}] keys=`, Object.keys(g));
+    console.log(`grade[${i}] sample=`, JSON.stringify(g, null, 2).slice(0, 800));
+  });
+  try {
+    fs.writeFileSync('grades_raw.debug.json', JSON.stringify(gradesArrRaw, null, 2));
+    console.log('💾 grades_raw.debug.json geschreven');
+  } catch (e) {
+    console.warn('⚠️ Kon grades_raw.debug.json niet schrijven:', e.message);
+  }
+}
+
+    
     // Filter op GRADE_IDS (optioneel)
+/*. Section replaced 
     const onlyIds = (GRADE_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
     const gradesArr = gradesArrRaw.filter(g => {
       const gid = String(g?.id ?? g?.gradeId ?? '').trim();
       return gid && (!onlyIds.length || onlyIds.includes(gid));
     });
+*/
+
+const onlyIdsRaw = (GRADE_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
+const onlyIds = onlyIdsRaw.map(x => String(x));
+
+if (VERBOSE >= 1) {
+  console.log('🔎 Filter GRADE_IDS =', onlyIds);
+}
+
+const gradesArr = gradesArrRaw.filter((g) => {
+  const gid = getGradeId(g);
+  if (!gid) {
+    if (VERBOSE >= 1) console.log('⚠️ Grade zonder herkenbare id, skip:', g);
+    return false; // of true, als je álle onbekende toch wilt verwerken
+  }
+  if (!onlyIds.length) return true;
+  const keep = onlyIds.includes(gid);
+  if (!keep && VERBOSE >= 1) {
+    console.log(`🚫 Gefilterd weg: gradeId=${gid} (niet in ${onlyIds.join(',')})`);
+  }
+  return keep;
+});
+
+console.log(`🧮 Te verwerken grades: ${gradesArr.length}${onlyIds.length ? ` (gefilterd uit ${gradesArrRaw.length})` : ''}`);
+
+if (VERBOSE >= 1 && gradesArr.length) {
+  const ids = gradesArr.map(getGradeId);
+  console.log('✅ IDs die we gaan verwerken:', ids.slice(0, 50).join(', '), ids.length > 50 ? '…' : '');
+}
 
     console.log(`🧮 Te verwerken grades: ${gradesArr.length}${onlyIds.length ? ` (gefilterd uit ${gradesArrRaw.length})` : ''}`);
 
     const masterRows = [];
 
     for (const g of gradesArr) {
-      const gid = String(g?.id ?? g?.gradeId ?? '').trim();
-      const seasonInGrade = String(g?.seasonId ?? g?.seasonid ?? '').trim(); // indien aanwezig
+      // const gid = String(g?.id ?? g?.gradeId ?? '').trim();      Replaced by next line
+      const gid = getGradeId(g);
+
+     //  const seasonInGrade = String(g?.seasonId ?? g?.seasonid ?? '').trim(); // indien aanwezig
+        const seasonInGrade = getSeasonIdFromGrade(g) || SEASON_ID || '';
+        if (VERBOSE >= 1) console.log(`ℹ️ grade ${gid} gebruikt seasonId=${seasonInGrade}`);
+
       if (!gid) { console.warn('⚠️ Grade zonder id, sla over'); continue; }
 
       const sheetName = `Grade_${gid}`;

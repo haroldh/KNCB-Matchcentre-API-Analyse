@@ -1,0 +1,2216 @@
+[
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "18",
+    "grade_id": 71374,
+    "grade_name": "Topklasse",
+    "grade_short_name": "TK",
+    "pools": [],
+    "round_list": "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      },
+      {
+        "id": "4"
+      },
+      {
+        "id": "5"
+      },
+      {
+        "id": "6"
+      },
+      {
+        "id": "7"
+      },
+      {
+        "id": "8"
+      },
+      {
+        "id": "9"
+      },
+      {
+        "id": "10"
+      },
+      {
+        "id": "11"
+      },
+      {
+        "id": "12"
+      },
+      {
+        "id": "13"
+      },
+      {
+        "id": "14"
+      },
+      {
+        "id": "15"
+      },
+      {
+        "id": "16"
+      },
+      {
+        "id": "17"
+      },
+      {
+        "id": "18"
+      }
+    ],
+    "sort_order": 1,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "1",
+    "grade_id": 94308,
+    "grade_name": "TK - HK Promotie - Degradatie Play Off",
+    "grade_short_name": "TKHLPO",
+    "pools": [],
+    "round_list": "1",
+    "rounds": [
+      {
+        "id": "1"
+      }
+    ],
+    "sort_order": 2,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "18",
+    "grade_id": 71375,
+    "grade_name": "Hoofdklasse",
+    "grade_short_name": "HK",
+    "pools": [],
+    "round_list": "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      },
+      {
+        "id": "4"
+      },
+      {
+        "id": "5"
+      },
+      {
+        "id": "6"
+      },
+      {
+        "id": "7"
+      },
+      {
+        "id": "8"
+      },
+      {
+        "id": "9"
+      },
+      {
+        "id": "10"
+      },
+      {
+        "id": "11"
+      },
+      {
+        "id": "12"
+      },
+      {
+        "id": "13"
+      },
+      {
+        "id": "14"
+      },
+      {
+        "id": "15"
+      },
+      {
+        "id": "16"
+      },
+      {
+        "id": "17"
+      },
+      {
+        "id": "18"
+      }
+    ],
+    "sort_order": 3,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "18",
+    "grade_id": 73934,
+    "grade_name": "Eerste Klasse",
+    "grade_short_name": "EK",
+    "pools": [],
+    "round_list": "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      },
+      {
+        "id": "4"
+      },
+      {
+        "id": "5"
+      },
+      {
+        "id": "6"
+      },
+      {
+        "id": "7"
+      },
+      {
+        "id": "8"
+      },
+      {
+        "id": "9"
+      },
+      {
+        "id": "10"
+      },
+      {
+        "id": "11"
+      },
+      {
+        "id": "12"
+      },
+      {
+        "id": "13"
+      },
+      {
+        "id": "14"
+      },
+      {
+        "id": "15"
+      },
+      {
+        "id": "16"
+      },
+      {
+        "id": "17"
+      },
+      {
+        "id": "18"
+      }
+    ],
+    "sort_order": 5,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "3",
+    "grade_id": 71378,
+    "grade_name": "Topklasse Twenty20",
+    "grade_short_name": "TK T20",
+    "pools": [],
+    "round_list": "1,2,3,4,5,6,7",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      },
+      {
+        "id": "4"
+      },
+      {
+        "id": "5"
+      },
+      {
+        "id": "6"
+      },
+      {
+        "id": "7"
+      }
+    ],
+    "sort_order": 7,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "3",
+    "grade_id": 82134,
+    "grade_name": "Hoofdklasse Twenty20",
+    "grade_short_name": "HK T20",
+    "pools": [],
+    "round_list": "1,2,3,4,5,6,7",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      },
+      {
+        "id": "4"
+      },
+      {
+        "id": "5"
+      },
+      {
+        "id": "6"
+      },
+      {
+        "id": "7"
+      }
+    ],
+    "sort_order": 8,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "3",
+    "grade_id": 82135,
+    "grade_name": "Eerst Klasse Twenty20",
+    "grade_short_name": "EK T20",
+    "pools": [],
+    "round_list": "1,2,3,4,5,6,7",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      },
+      {
+        "id": "4"
+      },
+      {
+        "id": "5"
+      },
+      {
+        "id": "6"
+      },
+      {
+        "id": "7"
+      }
+    ],
+    "sort_order": 9,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "10",
+    "grade_id": 73940,
+    "grade_name": "Tweede Klasse",
+    "grade_short_name": "2e Klasse",
+    "pools": [
+      {
+        "pool_id": 330,
+        "pool_name": "Tweede Klasse A",
+        "sort_order": 1
+      },
+      {
+        "pool_id": 331,
+        "pool_name": "Tweede Klasse B",
+        "sort_order": 2
+      }
+    ],
+    "round_list": "1,2,3,4,5,6,7,8,9,10,11,12,13,14",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      },
+      {
+        "id": "4"
+      },
+      {
+        "id": "5"
+      },
+      {
+        "id": "6"
+      },
+      {
+        "id": "7"
+      },
+      {
+        "id": "8"
+      },
+      {
+        "id": "9"
+      },
+      {
+        "id": "10"
+      },
+      {
+        "id": "11"
+      },
+      {
+        "id": "12"
+      },
+      {
+        "id": "13"
+      },
+      {
+        "id": "14"
+      }
+    ],
+    "sort_order": 10,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "10",
+    "grade_id": 73941,
+    "grade_name": "Derde Klasse",
+    "grade_short_name": "3e Klasse",
+    "pools": [
+      {
+        "pool_id": 332,
+        "pool_name": "3A",
+        "sort_order": 1
+      },
+      {
+        "pool_id": 333,
+        "pool_name": "3B",
+        "sort_order": 2
+      },
+      {
+        "pool_id": 334,
+        "pool_name": "3C",
+        "sort_order": 3
+      },
+      {
+        "pool_id": 335,
+        "pool_name": "3D",
+        "sort_order": 4
+      }
+    ],
+    "round_list": "1,2,3,4,5,6,7,8,9,10,11,12,13,14",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      },
+      {
+        "id": "4"
+      },
+      {
+        "id": "5"
+      },
+      {
+        "id": "6"
+      },
+      {
+        "id": "7"
+      },
+      {
+        "id": "8"
+      },
+      {
+        "id": "9"
+      },
+      {
+        "id": "10"
+      },
+      {
+        "id": "11"
+      },
+      {
+        "id": "12"
+      },
+      {
+        "id": "13"
+      },
+      {
+        "id": "14"
+      }
+    ],
+    "sort_order": 11,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "9",
+    "grade_id": 73942,
+    "grade_name": "Vierde Klasse",
+    "grade_short_name": "4e Klasse",
+    "pools": [
+      {
+        "pool_id": 336,
+        "pool_name": "4A",
+        "sort_order": 1
+      },
+      {
+        "pool_id": 337,
+        "pool_name": "4B",
+        "sort_order": 2
+      },
+      {
+        "pool_id": 338,
+        "pool_name": "4C",
+        "sort_order": 3
+      },
+      {
+        "pool_id": 339,
+        "pool_name": "4D",
+        "sort_order": 4
+      },
+      {
+        "pool_id": 340,
+        "pool_name": "4E",
+        "sort_order": 5
+      },
+      {
+        "pool_id": 341,
+        "pool_name": "4F",
+        "sort_order": 6
+      }
+    ],
+    "round_list": "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      },
+      {
+        "id": "4"
+      },
+      {
+        "id": "5"
+      },
+      {
+        "id": "6"
+      },
+      {
+        "id": "7"
+      },
+      {
+        "id": "8"
+      },
+      {
+        "id": "9"
+      },
+      {
+        "id": "10"
+      },
+      {
+        "id": "11"
+      },
+      {
+        "id": "12"
+      },
+      {
+        "id": "13"
+      },
+      {
+        "id": "14"
+      },
+      {
+        "id": "15"
+      },
+      {
+        "id": "16"
+      },
+      {
+        "id": "17"
+      },
+      {
+        "id": "18"
+      }
+    ],
+    "sort_order": 12,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "QF",
+    "grade_id": 73945,
+    "grade_name": "Lagere Klassen Twenty20",
+    "grade_short_name": "LK T20",
+    "pools": [
+      {
+        "pool_id": 364,
+        "pool_name": "LK T20 A",
+        "sort_order": 1
+      },
+      {
+        "pool_id": 365,
+        "pool_name": "LK T20 B",
+        "sort_order": 2
+      },
+      {
+        "pool_id": 366,
+        "pool_name": "LK T20 C",
+        "sort_order": 3
+      },
+      {
+        "pool_id": 367,
+        "pool_name": "LK T20 D",
+        "sort_order": 4
+      },
+      {
+        "pool_id": 368,
+        "pool_name": "LK T20 E",
+        "sort_order": 5
+      },
+      {
+        "pool_id": 369,
+        "pool_name": "LK T20 F",
+        "sort_order": 6
+      },
+      {
+        "pool_id": 370,
+        "pool_name": "LK T20 G",
+        "sort_order": 7
+      },
+      {
+        "pool_id": 371,
+        "pool_name": "LK T20 H",
+        "sort_order": 8
+      }
+    ],
+    "round_list": "1,2,3,4,5,6,7,8,9,10,QF,SF,GF",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      },
+      {
+        "id": "4"
+      },
+      {
+        "id": "5"
+      },
+      {
+        "id": "6"
+      },
+      {
+        "id": "7"
+      },
+      {
+        "id": "8"
+      },
+      {
+        "id": "9"
+      },
+      {
+        "id": "10"
+      },
+      {
+        "id": "QF"
+      },
+      {
+        "id": "SF"
+      },
+      {
+        "id": "GF"
+      }
+    ],
+    "sort_order": 13,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "6",
+    "grade_id": 75993,
+    "grade_name": "Vrouwen T20",
+    "grade_short_name": "VT20",
+    "pools": [],
+    "round_list": "1,2,3,4,5,6,7,8,9,GF",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      },
+      {
+        "id": "4"
+      },
+      {
+        "id": "5"
+      },
+      {
+        "id": "6"
+      },
+      {
+        "id": "7"
+      },
+      {
+        "id": "8"
+      },
+      {
+        "id": "9"
+      },
+      {
+        "id": "GF"
+      }
+    ],
+    "sort_order": 14,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "6",
+    "grade_id": 82349,
+    "grade_name": "Vrouwen Topklasse",
+    "grade_short_name": "VTK",
+    "pools": [],
+    "round_list": "1,2,3,4,5,6,GF",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      },
+      {
+        "id": "4"
+      },
+      {
+        "id": "5"
+      },
+      {
+        "id": "6"
+      },
+      {
+        "id": "GF"
+      }
+    ],
+    "sort_order": 15,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "6",
+    "grade_id": 82351,
+    "grade_name": "Vrouwen Hoofdklasse",
+    "grade_short_name": "VHK",
+    "pools": [],
+    "round_list": "1,2,3,4,5,6,GF",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      },
+      {
+        "id": "4"
+      },
+      {
+        "id": "5"
+      },
+      {
+        "id": "6"
+      },
+      {
+        "id": "GF"
+      }
+    ],
+    "sort_order": 16,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "9",
+    "grade_id": 73943,
+    "grade_name": "Zami",
+    "grade_short_name": "Zami",
+    "pools": [
+      {
+        "pool_id": 381,
+        "pool_name": "ZaMi 1",
+        "sort_order": 1
+      },
+      {
+        "pool_id": 382,
+        "pool_name": "ZaMi A",
+        "sort_order": 2
+      },
+      {
+        "pool_id": 383,
+        "pool_name": "Zami B",
+        "sort_order": 3
+      },
+      {
+        "pool_id": 384,
+        "pool_name": "ZaMi C",
+        "sort_order": 4
+      },
+      {
+        "pool_id": 385,
+        "pool_name": "ZaMi D",
+        "sort_order": 5
+      }
+    ],
+    "round_list": "1,2,3,4,5,6,7,8,9,10,11,12,13,14",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      },
+      {
+        "id": "4"
+      },
+      {
+        "id": "5"
+      },
+      {
+        "id": "6"
+      },
+      {
+        "id": "7"
+      },
+      {
+        "id": "8"
+      },
+      {
+        "id": "9"
+      },
+      {
+        "id": "10"
+      },
+      {
+        "id": "11"
+      },
+      {
+        "id": "12"
+      },
+      {
+        "id": "13"
+      },
+      {
+        "id": "14"
+      }
+    ],
+    "sort_order": 17,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "14",
+    "grade_id": 73944,
+    "grade_name": "Zomi",
+    "grade_short_name": "Zomi",
+    "pools": [],
+    "round_list": "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      },
+      {
+        "id": "4"
+      },
+      {
+        "id": "5"
+      },
+      {
+        "id": "6"
+      },
+      {
+        "id": "7"
+      },
+      {
+        "id": "8"
+      },
+      {
+        "id": "9"
+      },
+      {
+        "id": "10"
+      },
+      {
+        "id": "11"
+      },
+      {
+        "id": "12"
+      },
+      {
+        "id": "13"
+      },
+      {
+        "id": "14"
+      },
+      {
+        "id": "15"
+      },
+      {
+        "id": "16"
+      }
+    ],
+    "sort_order": 18,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "10",
+    "grade_id": 75943,
+    "grade_name": "U17",
+    "grade_short_name": "U17",
+    "pools": [
+      {
+        "pool_id": 376,
+        "pool_name": "U17 A",
+        "sort_order": 1
+      },
+      {
+        "pool_id": 377,
+        "pool_name": "U17 B",
+        "sort_order": 2
+      }
+    ],
+    "round_list": "1,2,3,4,5,6,7,8,9,10",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      },
+      {
+        "id": "4"
+      },
+      {
+        "id": "5"
+      },
+      {
+        "id": "6"
+      },
+      {
+        "id": "7"
+      },
+      {
+        "id": "8"
+      },
+      {
+        "id": "9"
+      },
+      {
+        "id": "10"
+      }
+    ],
+    "sort_order": 19,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "9",
+    "grade_id": 75913,
+    "grade_name": "U15",
+    "grade_short_name": "U15",
+    "pools": [
+      {
+        "pool_id": 378,
+        "pool_name": "U15 A",
+        "sort_order": 1
+      },
+      {
+        "pool_id": 379,
+        "pool_name": "U15 B",
+        "sort_order": 2
+      },
+      {
+        "pool_id": 380,
+        "pool_name": "U15 C",
+        "sort_order": 3
+      }
+    ],
+    "round_list": "1,2,3,4,5,6,7,8,9,10",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      },
+      {
+        "id": "4"
+      },
+      {
+        "id": "5"
+      },
+      {
+        "id": "6"
+      },
+      {
+        "id": "7"
+      },
+      {
+        "id": "8"
+      },
+      {
+        "id": "9"
+      },
+      {
+        "id": "10"
+      }
+    ],
+    "sort_order": 20,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "8",
+    "grade_id": 75914,
+    "grade_name": "U13",
+    "grade_short_name": "U13",
+    "pools": [
+      {
+        "pool_id": 391,
+        "pool_name": "U13 A",
+        "sort_order": 1
+      },
+      {
+        "pool_id": 392,
+        "pool_name": "U13 B",
+        "sort_order": 2
+      }
+    ],
+    "round_list": "1,2,3,4,5,6,7,8,9",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      },
+      {
+        "id": "4"
+      },
+      {
+        "id": "5"
+      },
+      {
+        "id": "6"
+      },
+      {
+        "id": "7"
+      },
+      {
+        "id": "8"
+      },
+      {
+        "id": "9"
+      }
+    ],
+    "sort_order": 21,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "10",
+    "grade_id": 75916,
+    "grade_name": "U11 HB",
+    "grade_short_name": "U11 HB",
+    "pools": [
+      {
+        "pool_id": 386,
+        "pool_name": "U11 A",
+        "sort_order": 1
+      },
+      {
+        "pool_id": 387,
+        "pool_name": "U11 B",
+        "sort_order": 2
+      },
+      {
+        "pool_id": 388,
+        "pool_name": "U11 C",
+        "sort_order": 3
+      },
+      {
+        "pool_id": 389,
+        "pool_name": "U11 D",
+        "sort_order": 4
+      },
+      {
+        "pool_id": 390,
+        "pool_name": "U11 E",
+        "sort_order": 5
+      }
+    ],
+    "round_list": "1,2,3,4,5,6,7,8,9,10",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      },
+      {
+        "id": "4"
+      },
+      {
+        "id": "5"
+      },
+      {
+        "id": "6"
+      },
+      {
+        "id": "7"
+      },
+      {
+        "id": "8"
+      },
+      {
+        "id": "9"
+      },
+      {
+        "id": "10"
+      }
+    ],
+    "sort_order": 22,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "2",
+    "grade_id": 79816,
+    "grade_name": "Bedrijfscompetitie",
+    "grade_short_name": "BCOMP",
+    "pools": [
+      {
+        "pool_id": 342,
+        "pool_name": "Poule A",
+        "sort_order": 1
+      },
+      {
+        "pool_id": 343,
+        "pool_name": "Poule B",
+        "sort_order": 2
+      }
+    ],
+    "round_list": "1,2,3,4,5,6,7,8,9,10,11,12,13,14",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      },
+      {
+        "id": "4"
+      },
+      {
+        "id": "5"
+      },
+      {
+        "id": "6"
+      },
+      {
+        "id": "7"
+      },
+      {
+        "id": "8"
+      },
+      {
+        "id": "9"
+      },
+      {
+        "id": "10"
+      },
+      {
+        "id": "11"
+      },
+      {
+        "id": "12"
+      },
+      {
+        "id": "13"
+      },
+      {
+        "id": "14"
+      }
+    ],
+    "sort_order": 25,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "2",
+    "grade_id": 93531,
+    "grade_name": "Friendly Matches",
+    "grade_short_name": "FM",
+    "pools": [],
+    "round_list": "1,2,3,4,5,6,7,8",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      },
+      {
+        "id": "4"
+      },
+      {
+        "id": "5"
+      },
+      {
+        "id": "6"
+      },
+      {
+        "id": "7"
+      },
+      {
+        "id": "8"
+      }
+    ],
+    "sort_order": 31,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "3",
+    "grade_id": 94441,
+    "grade_name": "CTC De Flamingo's Jeugd Toernooi",
+    "grade_short_name": "FJT",
+    "pools": [],
+    "round_list": "1,2,3,4,5,6,SF,GF",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      },
+      {
+        "id": "4"
+      },
+      {
+        "id": "5"
+      },
+      {
+        "id": "6"
+      },
+      {
+        "id": "SF"
+      },
+      {
+        "id": "GF"
+      }
+    ],
+    "sort_order": 32,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "6",
+    "grade_id": 76036,
+    "grade_name": "Men's Pro Series",
+    "grade_short_name": "Men's Pro Series",
+    "pools": [],
+    "round_list": "1,2,3,4,5,6",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      },
+      {
+        "id": "4"
+      },
+      {
+        "id": "5"
+      },
+      {
+        "id": "6"
+      }
+    ],
+    "sort_order": 107,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "7",
+    "grade_id": 76801,
+    "grade_name": "Qui Vive Premier League",
+    "grade_short_name": "QPL",
+    "pools": [],
+    "round_list": "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      },
+      {
+        "id": "4"
+      },
+      {
+        "id": "5"
+      },
+      {
+        "id": "6"
+      },
+      {
+        "id": "7"
+      },
+      {
+        "id": "8"
+      },
+      {
+        "id": "9"
+      },
+      {
+        "id": "10"
+      },
+      {
+        "id": "11"
+      },
+      {
+        "id": "12"
+      },
+      {
+        "id": "13"
+      },
+      {
+        "id": "14"
+      },
+      {
+        "id": "15"
+      },
+      {
+        "id": "16"
+      },
+      {
+        "id": "17"
+      },
+      {
+        "id": "18"
+      },
+      {
+        "id": "19"
+      },
+      {
+        "id": "20"
+      },
+      {
+        "id": "21"
+      },
+      {
+        "id": "22"
+      },
+      {
+        "id": "23"
+      },
+      {
+        "id": "24"
+      },
+      {
+        "id": "25"
+      },
+      {
+        "id": "26"
+      },
+      {
+        "id": "27"
+      },
+      {
+        "id": "28"
+      }
+    ],
+    "sort_order": 110,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "GF",
+    "grade_id": 88310,
+    "grade_name": "Youth Qui Vive Premier league U13",
+    "grade_short_name": "YQPL U13",
+    "pools": [],
+    "round_list": "1,2,3,4,5,6,GF",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      },
+      {
+        "id": "4"
+      },
+      {
+        "id": "5"
+      },
+      {
+        "id": "6"
+      },
+      {
+        "id": "GF"
+      }
+    ],
+    "sort_order": 115,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "GF",
+    "grade_id": 92865,
+    "grade_name": "Youth Qui Vive Premier league U16",
+    "grade_short_name": "YQPL U16",
+    "pools": [],
+    "round_list": "1,2,3,4,5,6,QF,GF",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      },
+      {
+        "id": "4"
+      },
+      {
+        "id": "5"
+      },
+      {
+        "id": "6"
+      },
+      {
+        "id": "QF"
+      },
+      {
+        "id": "GF"
+      }
+    ],
+    "sort_order": 116,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "1",
+    "grade_id": 90057,
+    "grade_name": "Pakistan Ambassador Cup",
+    "grade_short_name": "PAC",
+    "pools": [],
+    "round_list": "1",
+    "rounds": [
+      {
+        "id": "1"
+      }
+    ],
+    "sort_order": 119,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "4",
+    "grade_id": 93626,
+    "grade_name": "Haagse Jeugd 100 U9",
+    "grade_short_name": "HJ100",
+    "pools": [],
+    "round_list": "1,2,3,4",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      },
+      {
+        "id": "4"
+      }
+    ],
+    "sort_order": 120,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "3",
+    "grade_id": 93627,
+    "grade_name": "Haagse Jeugd 100 U11",
+    "grade_short_name": "HJ100 U11",
+    "pools": [],
+    "round_list": "1,2,3,4",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      },
+      {
+        "id": "4"
+      }
+    ],
+    "sort_order": 121,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "4",
+    "grade_id": 93628,
+    "grade_name": "Haagse Jeugd 100 U13",
+    "grade_short_name": "HJ100 U13",
+    "pools": [],
+    "round_list": "1,2,3,4",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      },
+      {
+        "id": "4"
+      }
+    ],
+    "sort_order": 122,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "3",
+    "grade_id": 93629,
+    "grade_name": "Haagse Jeugd 100 U15",
+    "grade_short_name": "HJ100 U15",
+    "pools": [],
+    "round_list": "1,2,3,4",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      },
+      {
+        "id": "4"
+      }
+    ],
+    "sort_order": 123,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "4",
+    "grade_id": 93630,
+    "grade_name": "Haagse Jeugd 100 U17",
+    "grade_short_name": "HJ100 U17",
+    "pools": [],
+    "round_list": "1,2,3,4",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      },
+      {
+        "id": "4"
+      }
+    ],
+    "sort_order": 124,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "3",
+    "grade_id": 93976,
+    "grade_name": "The Jan-Willem Trophy",
+    "grade_short_name": "TJWT",
+    "pools": [],
+    "round_list": "1,2,3",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      }
+    ],
+    "sort_order": 125,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "2",
+    "grade_id": 93218,
+    "grade_name": "Netherlands A v UAE XI series",
+    "grade_short_name": "NLAvUAEXI",
+    "pools": [],
+    "round_list": "1,2",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      }
+    ],
+    "sort_order": 301,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "5",
+    "grade_id": 93846,
+    "grade_name": "ICC T20 WCQ 2025 Warm-Up Matches",
+    "grade_short_name": "ICC T20 WCQ 2025 WU",
+    "pools": [],
+    "round_list": "1,2,3,4,5",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      },
+      {
+        "id": "4"
+      },
+      {
+        "id": "5"
+      }
+    ],
+    "sort_order": 302,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "10",
+    "grade_id": 79968,
+    "grade_name": "KNCB Mini Pro Series",
+    "grade_short_name": "KMPS",
+    "pools": [],
+    "round_list": "1,2,3,4,5,6,7,8,9,10",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      },
+      {
+        "id": "4"
+      },
+      {
+        "id": "5"
+      },
+      {
+        "id": "6"
+      },
+      {
+        "id": "7"
+      },
+      {
+        "id": "8"
+      },
+      {
+        "id": "9"
+      },
+      {
+        "id": "10"
+      }
+    ],
+    "sort_order": 400,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "3",
+    "grade_id": 80248,
+    "grade_name": "U15 Girl's Netherlands v Scotland",
+    "grade_short_name": "",
+    "pools": [],
+    "round_list": "1,2,3",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      }
+    ],
+    "sort_order": 401,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "2",
+    "grade_id": 80481,
+    "grade_name": "North East Cricket Series",
+    "grade_short_name": "NECS",
+    "pools": [],
+    "round_list": "1,2",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      }
+    ],
+    "sort_order": 403,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "5",
+    "grade_id": 79969,
+    "grade_name": "KNCB Young Pro Series",
+    "grade_short_name": "KYPS",
+    "pools": [],
+    "round_list": "1,2,3,4,5",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      },
+      {
+        "id": "4"
+      },
+      {
+        "id": "5"
+      }
+    ],
+    "sort_order": 404,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "3",
+    "grade_id": 83848,
+    "grade_name": "U18 Quadrangular Series 2025",
+    "grade_short_name": "U18 Quad Series 2025",
+    "pools": [],
+    "round_list": "1,2,3",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      }
+    ],
+    "sort_order": 409,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "3",
+    "grade_id": 83849,
+    "grade_name": "U14 Nertherlands v Denmark",
+    "grade_short_name": "U16 NED v DEN",
+    "pools": [],
+    "round_list": "1,2,3",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      }
+    ],
+    "sort_order": 410,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "5",
+    "grade_id": 94238,
+    "grade_name": "Middlesex Schools National Team Festivals",
+    "grade_short_name": "",
+    "pools": [],
+    "round_list": "1,2,3,4,5",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      },
+      {
+        "id": "4"
+      },
+      {
+        "id": "5"
+      }
+    ],
+    "sort_order": 411,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "3",
+    "grade_id": 80033,
+    "grade_name": "Dutch Women's Super Series",
+    "grade_short_name": "DWSS",
+    "pools": [],
+    "round_list": "1,2,3,4,5",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      },
+      {
+        "id": "4"
+      },
+      {
+        "id": "5"
+      }
+    ],
+    "sort_order": 501,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "2",
+    "grade_id": 89359,
+    "grade_name": "Netherlands XI vs USA XI",
+    "grade_short_name": "WT20",
+    "pools": [],
+    "round_list": "1,2",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      }
+    ],
+    "sort_order": 512,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "5",
+    "grade_id": 89360,
+    "grade_name": "Women's T20I Series Netherlands vs USA",
+    "grade_short_name": "WT20I-NEDvUSA",
+    "pools": [],
+    "round_list": "1,2,3,4,5",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      },
+      {
+        "id": "4"
+      },
+      {
+        "id": "5"
+      }
+    ],
+    "sort_order": 513,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "3",
+    "grade_id": 93357,
+    "grade_name": "Dutch Women's U19 Super Series",
+    "grade_short_name": "DWU19SS",
+    "pools": [],
+    "round_list": "1,2,3",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      }
+    ],
+    "sort_order": 514,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "1",
+    "grade_id": 80565,
+    "grade_name": "U17 Girl's Tri Series",
+    "grade_short_name": "U17 Girl's Tri Serie",
+    "pools": [],
+    "round_list": "1",
+    "rounds": [
+      {
+        "id": "1"
+      }
+    ],
+    "sort_order": 515,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  },
+  {
+    "association_id": 134453,
+    "association_name": "Koninklijke Nederlandse Cricket Bond",
+    "curr_round_results": "7",
+    "grade_id": 93575,
+    "grade_name": "Dutch Lionesses U15 Friendlies",
+    "grade_short_name": "DLS U15",
+    "pools": [],
+    "round_list": "1,2,3,4,5,6,7",
+    "rounds": [
+      {
+        "id": "1"
+      },
+      {
+        "id": "2"
+      },
+      {
+        "id": "3"
+      },
+      {
+        "id": "4"
+      },
+      {
+        "id": "5"
+      },
+      {
+        "id": "6"
+      },
+      {
+        "id": "7"
+      }
+    ],
+    "sort_order": 516,
+    "team_category": null,
+    "team_gender": null,
+    "team_number": 1,
+    "teams": null
+  }
+]
