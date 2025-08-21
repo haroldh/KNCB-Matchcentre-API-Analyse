@@ -18,6 +18,11 @@ logs
 *.log
 *.log.*
 
+# keys
+.*credentials.json
+*credentials.json
+*credentials*.json
+
 # Editor directories and files
 .vscode/
 .idea/
@@ -27,6 +32,9 @@ logs
 # OS-specific files
 .DS_Store
 Thumbs.db
+
+# data
+*.csv
 
 # Testing and coverage
 coverage/

@@ -60,7 +60,7 @@ const {
 const SLOWDOWN_MS = Number(process.env.SLOWDOWN_MS ?? 1200);
 const TIMEOUT_MS  = Number(process.env.PUPPETEER_TIMEOUT_MS ?? 30000);
 const VERBOSE = Number(process.env.VERBOSE ?? 0);
-
+const DISABLE_SHEETS = String(process.env.DISABLE_SHEETS ?? '').toLowerCase() === '1';
 
 // ---------- Telegram (zonder parse_mode) ----------
 async function notifyTelegram(text) {
@@ -201,7 +201,7 @@ function buildMatchUrl(baseUrl, { gradeId, seasonId }) {
 function getGradeId(g) {
   // Probeer meerdere varianten
   const candidates = [
-    g?.gradeId, g?.gradeID, g?.gradeid,
+    g?.gradeId, g?.gradeID, g?.gradeid, g?.grade_id,
     g?.id, g?.Id, g?.ID,
     g?.grade?.id, g?.grade?.gradeId, g?.GradeId
   ];
@@ -266,9 +266,30 @@ async function pageFetchJson(page, url) {
 
     const refPage = pickReferrer();
 
+    /*
     const sheets = (SPREADSHEET_ID && GOOGLE_APPLICATION_CREDENTIALS)
       ? await getSheetsClient()
       : null;
+*/ // Vervangen door volgende sectie:
+let sheets = null;
+if (!DISABLE_SHEETS && SPREADSHEET_ID && GOOGLE_APPLICATION_CREDENTIALS) {
+  try {
+    console.log('🔐 Init Google Sheets using', GOOGLE_APPLICATION_CREDENTIALS);
+    sheets = await getSheetsClient();
+    // log het service account adres ter controle (zonder secrets)
+    try {
+      const raw = JSON.parse(fs.readFileSync(GOOGLE_APPLICATION_CREDENTIALS, 'utf8'));
+      if (raw?.client_email) console.log('🔑 Service account:', raw.client_email);
+      if (raw?.type) console.log('🔑 Credential type:', raw.type);
+    } catch {}
+  } catch (e) {
+    console.warn('⚠️ Sheets init mislukt; ga verder zonder Sheets:', e.message);
+    sheets = null;
+  }
+} else {
+  console.log('ℹ️ Sheets uitgeschakeld (DISABLE_SHEETS=1 of ontbrekende env).');
+}
+
 
     console.log('🚀 Start puppeteer…');
     browser = await puppeteer.launch({
