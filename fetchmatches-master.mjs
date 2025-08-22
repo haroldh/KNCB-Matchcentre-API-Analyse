@@ -168,6 +168,45 @@ function uniqueFields(rows) {
   return [...set];
 }
 
+async function logCookies(page, label) {
+  try {
+    const cookies = await page.browserContext().cookies();
+    console.log(`🍪 ${label}: ${cookies.map(c => c.name).join(',')}`);
+  } catch (e) {
+    console.warn(`🍪 ${label}: kon cookies niet lezen: ${e.message}`);
+  }
+}
+
+// Haal entity/tenant id uit een grade-object.
+// Resultsvault-grade payloads bevatten vaak een entiteit/associatie id.
+// We proberen algemene varianten; loggen als we iets vinden.
+function getEntityIdFromGrade(g) {
+  const cands = [
+    g?.entity_id, g?.entityId, g?.association_id, g?.associationId,
+    g?.org_id, g?.orgId, g?.entity?.id, g?.Association?.Id
+  ];
+  for (const c of cands) {
+    if (c != null && String(c).trim() !== "") return String(c).trim();
+  }
+  return ""; // onbekend -> val terug op RV_ID uit .env
+}
+
+// Bouw base RV endpoint dynamisch per entity.
+// Vervangt het padsegment rv/<...>/ door de opgegeven entityId.
+function buildEntityScopedBase(baseUrl, entityIdFallback, entityIdMaybe) {
+  const u = new URL(baseUrl.toString());
+  const path = u.pathname.split("/").filter(Boolean); // ['rv','134453','matches',...]
+  const idx = path.indexOf("rv");
+  if (idx !== -1 && path.length > idx + 1) {
+    // vervang huidige rv/<id> door rv/<entityId>
+    const newId = (entityIdMaybe && /^\d+$/.test(entityIdMaybe)) ? entityIdMaybe : entityIdFallback;
+    path[idx + 1] = String(newId);
+    u.pathname = "/" + path.join("/");
+  }
+  return u;
+}
+
+
 function flattenObject(obj) {
   // Geneste arrays/objects → JSON-string; voorkomt "list_value/struct_value" errors in Sheets
   const out = {};
@@ -480,22 +519,37 @@ async function pageFetchJsonWithRetry(page, url, { refPageUrl, label }) {
       const sheetName = `Grade_${gid}`;
       if (sheets) await ensureSheet(sheets, sheetName);
 
-      const matchUrl = buildMatchUrl(MATCH_URL, { gradeId: gid, seasonId: seasonInGrade || SEASON_ID });
-      console.log("🌐 Fetch matches:", matchUrl);
+      const entityId = getEntityIdFromGrade(g);             // ← nieuw
+const scopedBase = buildEntityScopedBase(MATCH_URL,   // ← nieuw
+                    process.env.RV_ID, entityId);
+const matchUrl = buildMatchUrl(scopedBase, {          // ← aangepast: scopedBase i.p.v. MATCH_URL
+  gradeId: gid,
+  seasonId: seasonInGrade || SEASON_ID
+});
+console.log(`🏷️ entityId=${entityId || process.env.RV_ID} → ${matchUrl}`);
+
 
       const matchesJson = await pageFetchJsonWithRetry(page, matchUrl, {
         refPageUrl: refPage,
         label: `grade ${gid}`,
       });
 
-      if (matchesJson?.__error) {
-        const msg = `⚠️ Fout bij grade ${gid}: ${matchesJson.__error}${
-          matchesJson.__head ? ` | head=${matchesJson.__head}` : ""
-        }`;
-        console.error(msg);
-        await notifyTelegram(msg);
-        continue;
-      }
+if (matchesJson?.__error) {
+  const msg = `⚠️ Fout bij grade ${gid} (entity=${entityId || process.env.RV_ID}): ${matchesJson.__error}${
+    matchesJson.__head ? ` | head=${matchesJson.__head}` : ""
+  }`;
+  console.error(msg);
+  await notifyTelegram(msg);
+  // Bonus: bij 401 eenmalig "hard refresh" van de referrer proberen
+  if (String(matchesJson.__error).includes("HTTP 401")) {
+    try {
+      console.log("🔄 401: hard refresh van referrer & korte pauze…");
+      await page.goto(refPage, { waitUntil: "networkidle0" });
+      await delay(1500);
+    } catch {}
+  }
+  continue;
+}
 
       const dataArr = extractArray(matchesJson);
       if (!Array.isArray(dataArr)) {
@@ -532,10 +586,16 @@ async function pageFetchJsonWithRetry(page, url, { refPageUrl, label }) {
       if (REFRESH_REFERRER_EVERY > 0 && processed % REFRESH_REFERRER_EVERY === 0) {
         console.log("🔄 Sessieverversing: referrer herladen…", refPage);
         try {
-          await page.goto(refPage, { waitUntil: "networkidle0" });
+await logCookies(page, 'before refresh');
+await page.goto(refPage, { waitUntil: 'networkidle0' });
+await logCookies(page, 'after refresh');
         } catch {}
         await delay(SLOWDOWN_MS);
+      
       }
+
+ck = await page.browserContext().cookies();
+console.log('🍪 after:', ck.map(c => c.name).join(','));
 
       await delay(SLOWDOWN_MS);
     }
