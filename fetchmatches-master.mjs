@@ -47,8 +47,7 @@ VERBOSE=1
 GRADE_IDS=           # optioneel filter, comma-separated
 
 // Sheets via SA of ADC; impersonation optioneel
-GOOGLE_APPLICATION_CREDENTIALS=./credentials.json
-GOOGLE_IMPERSONATE_SERVICE_ACCOUNT=
+
 ========================== */
 
 const {
@@ -66,6 +65,7 @@ const {
   TELEGRAM_CHAT_ID,
   GRADE_IDS,
   IAS_API_KEY,
+  GOOGLE_IMPERSONATE_SERVICE_ACCOUNT,
 } = process.env;
 
 const SLOWDOWN_MS = Number(process.env.SLOWDOWN_MS ?? 200);
@@ -273,7 +273,7 @@ async function warmupSession(page, { entityId, gradeId, seasonId }) {
     const warm = await page.browser().newPage();
     await warm.setViewport({ width: 160, height: 100 });
     await warm.goto(warmUrl, { waitUntil: "domcontentloaded", timeout: 15000 });
-    await warm.waitForTimeout(1000);
+    await delay(1000); // uit: node:timers/promises
     await warm.close();
     if (VERBOSE >= 1) console.log(`🔥 warmup ok for grade ${gradeId}`);
   } catch (e) {
