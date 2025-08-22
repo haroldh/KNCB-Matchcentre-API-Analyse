@@ -168,6 +168,21 @@ function uniqueFields(rows) {
   return [...set];
 }
 
+// ——— helpers: cookies & headers ———
+function buildCookieHeader(cookies) {
+  // cookies: array from browserContext.cookies()
+  if (!Array.isArray(cookies) || !cookies.length) return "";
+  return cookies
+    .filter(c => c && c.name && typeof c.value !== "undefined")
+    .map(c => `${c.name}=${c.value}`)
+    .join("; ");
+}
+
+function defaultUa() {
+  return "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+       + "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+}
+
 async function logCookies(page, label) {
   try {
     const cookies = await page.browserContext().cookies();
@@ -305,19 +320,37 @@ function writeCsv(filename, rows) {
   }
 }
 
-// Node-fetch fallback (zonder cookies) — soms werkt RV hiermee tóch op 401/403
-async function nodeFetchJson(url) {
+// ——— Node-fallback die exact lijkt op browsercontext (Origin/Referer/Cookie/UA) ———
+async function nodeFetchJsonWithCookies(url, {
+  referer,
+  origin,
+  cookieHeader,
+  userAgent = defaultUa(),
+} = {}) {
   try {
     const res = await fetch(url, {
+      // we sturen bewust dezelfde headers die de SPA zou sturen
       headers: {
-        accept: "application/json, text/plain;q=0.8, */*;q=0.5",
-        "user-agent": "Mozilla/5.0 KNCB-Matchcentre",
+        "accept": "application/json, text/plain;q=0.8, */*;q=0.5",
+        "user-agent": userAgent,
+        ...(origin ? { "origin": origin } : {}),
+        ...(referer ? { "referer": referer } : {}),
+        ...(cookieHeader ? { "cookie": cookieHeader } : {}),
+        "cache-control": "no-cache",
+        "pragma": "no-cache",
+        "x-requested-with": "XMLHttpRequest",
       },
+      redirect: "follow",
     });
+
     const text = await res.text();
     if (!res.ok) return { __error: `HTTP ${res.status}`, __head: text.slice(0, 220) };
-    const h = text.trim().charAt(0);
-    if (h !== "{" && h !== "[") return { __error: "Non-JSON response", __head: text.slice(0, 220) };
+
+    const ct = (res.headers.get("content-type") || "").toLowerCase();
+    if (!ct.includes("application/json")) {
+      const h = text.trim().charAt(0);
+      if (h !== "{" && h !== "[") return { __error: "Non-JSON response", __head: text.slice(0, 220) };
+    }
     try {
       return JSON.parse(text);
     } catch (e) {
@@ -327,6 +360,7 @@ async function nodeFetchJson(url) {
     return { __error: `Fetch failed: ${e.message}` };
   }
 }
+
 
 // 🌐 Versterkte fetch in page-context met credentials, Origin/Referer en backoff.
 //  - Op 401/403: referrer herladen (sessie reseeden) en retry
@@ -384,14 +418,37 @@ async function pageFetchJsonWithRetry(page, url, { refPageUrl, label }) {
       }`
     );
 
-    // Fallback: Node-fetch op 401/403 (soms werkt RV buiten browser beter)
+    // Fallback: Node-fetch met Cookie-header uit BrowserContext (401/403)
     if (USE_NODE_FETCH_ON_401 && (code === 401 || code === 403)) {
-      const alt = await nodeFetchJson(url);
-      if (!alt?.__error) {
-        console.log("🔁 Fallback via Node-fetch geslaagd:", label ?? url);
-        return alt;
+      try {
+        const ctx = page.browserContext();
+        const apiCookies = await ctx.cookies(new URL(u).origin);
+        const cookieHeader = buildCookieHeader(apiCookies);
+        const origin = new URL(ref).origin;
+
+        if (VERBOSE >= 1) {
+          console.log(`🍪 Node-fallback cookies (${apiCookies.length}):`,
+            apiCookies.map(c => c.name).join(","));
+        }
+
+        const alt = await nodeFetchJsonWithCookies(u, {
+          referer: ref,
+          origin,
+          cookieHeader,
+          userAgent: defaultUa(),
+        });
+
+        if (!alt?.__error) {
+          console.log("🔁 Fallback via Node-fetch (met cookies) geslaagd:", label ?? u);
+          return alt;
+        } else {
+          console.warn("⚠️ Node-fallback ook mislukt:", alt.__error, alt.__head || "");
+        }
+      } catch (e) {
+        console.warn("⚠️ Node-fallback exception:", e.message);
       }
     }
+
 
     if (attempt < RETRY_MAX && transient) {
       // Sessieverversing: referrer herladen vóór retry
@@ -462,6 +519,11 @@ async function pageFetchJsonWithRetry(page, url, { refPageUrl, label }) {
     // Referrer openen
     console.log("📥 Open referrer pagina…", refPage);
     await page.goto(refPage, { waitUntil: "networkidle0" });
+    try {
+  const ck1 = await page.browserContext().cookies(new URL("https://api.resultsvault.co.uk").origin);
+  console.log("🍪 API cookie names (init):", ck1.map(c => c.name).join(","));
+} catch {}
+
     await delay(SLOWDOWN_MS);
 
     // 1) GRADES ophalen + meteen wegschrijven naar GRADES-tab en GRADES.csv
