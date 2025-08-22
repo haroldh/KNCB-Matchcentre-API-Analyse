@@ -10,12 +10,12 @@ import { GoogleAuth } from "google-auth-library";
 import dotenv from "dotenv";
 import axios from "axios";
 import { setTimeout as delay } from "node:timers/promises";
+import { Impersonated } from 'google-auth-library';
 
 dotenv.config();
 
 /* ========= .env =========
 SPREADSHEET_ID=...
-GOOGLE_APPLICATION_CREDENTIALS=./.gcredentials.json
 TELEGRAM_BOT_TOKEN=...
 TELEGRAM_CHAT_ID=...
 SEASON_ID=19
@@ -24,8 +24,8 @@ MATCH_REFERRER_URL=https://matchcentre.kncb.nl/matches/
 GRADES_REFERRER_URL=https://matchcentre.kncb.nl/matches/
 SEASONS_REFERRER_URL=https://matchcentre.kncb.nl/seasons/
 API_URL=https://api.resultsvault.co.uk/rv/134453/?apiid=1002
-MATCH_JSON_API_ENDPOINT=https://api.resultsvault.co.uk/rv/134453/matches/?apiid=1002&seasonid=19&gradeid=71374&action=ors&maxrecs=1000&strmflg=1
-GRADES_JSON_API_ENDPOINT=https://api.resultsvault.co.uk/rv/134453/grades/?apiid=1002&seasonId=19
+MATCH_JSON_API_ENDPOINT=https://api.resultsvault.co.uk/rv/134453/matches/?apiid=1002&action=ors&maxrecs=1000&strmflg=1
+GRADES_JSON_API_ENDPOINT=https://api.resultsvault.co.uk/rv/134453/grades/?apiid=1002&seasonid=19
 MATCHSTATUS_JSON_API_ENDPOINT=https://api.resultsvault.co.uk/rv/lookup/?apiid=1002&sportid=1&lookupid=MATCH_BREAK_TYPES
 SEASONS_JSON_API_ENDPOINT=https://api.resultsvault.co.uk/rv/134453/seasons/?apiid=1002
 CSV_OUTPUT=matches.csv
@@ -60,14 +60,13 @@ const {
 const SLOWDOWN_MS = Number(process.env.SLOWDOWN_MS ?? 1200);
 const TIMEOUT_MS = Number(process.env.PUPPETEER_TIMEOUT_MS ?? 30000);
 const VERBOSE = Number(process.env.VERBOSE ?? 0);
-const DISABLE_SHEETS =
-  String(process.env.DISABLE_SHEETS ?? "").toLowerCase() === "1";
+const DISABLE_SHEETS =  String(process.env.DISABLE_SHEETS ?? "").toLowerCase() === "1";
 const RETRY_MAX = Number(process.env.RETRY_MAX ?? 4);
 const RETRY_BASE_DELAY_MS = Number(process.env.RETRY_BASE_DELAY_MS ?? 1200);
 const RETRY_JITTER_MS = Number(process.env.RETRY_JITTER_MS ?? 400);
 const REFRESH_REFERRER_EVERY = Number(process.env.REFRESH_REFERRER_EVERY ?? 5);
-const USE_NODE_FETCH_ON_401 =
-  String(process.env.USE_NODE_FETCH_ON_401 ?? "1") === "1";
+const USE_NODE_FETCH_ON_401 =  String(process.env.USE_NODE_FETCH_ON_401 ?? "1") === "1";
+const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
 
 const jitter = (ms) => ms + Math.floor(Math.random() * RETRY_JITTER_MS);
 const backoffMs = (attempt) =>
@@ -91,41 +90,42 @@ async function notifyTelegram(text) {
 }
 
 // ---------- Google Sheets ----------
-/*. Deze sectie wordt vervangen om gebruik te gaan maken van de Google Workflow identificatie
-async function getSheetsClient() {;
-  const auth = new google.auth.GoogleAuth({
-    keyFile: GOOGLE_APPLICATION_CREDENTIALS,
-    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-  });
-  return google.sheets({ version: 'v4', auth });
-}
-  */
+// Deze sectie werd vervangen om gebruik te gaan maken van de Google Workflow identificatie
 
 // ---------------- Google Sheets client (ADC + optional impersonation) ----------------
 
 async function getSheetsClient() {
-  const impersonate = process.env.GOOGLE_IMPERSONATE_SERVICE_ACCOUNT || null;
+  const impersonate = process.env.GOOGLE_IMPERSONATE_SERVICE_ACCOUNT;
 
-  // Belangrijk: scopes hier definiëren
-  const SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
+  if (impersonate && impersonate.trim()) {
+    // 1) Source creds (moeten cloud-platform scope hebben om IAMCredentials te mogen aanroepen)
+    const sourceAuth = new GoogleAuth({
+      scopes: ['https://www.googleapis.com/auth/cloud-platform']
+    });
+    const sourceClient = await sourceAuth.getClient();
 
-  const auth = new GoogleAuth({ scopes: SCOPES });
+    // 2) Impersonated token met expliciete targetScopes voor Sheets
+    const impersonated = new Impersonated({
+      sourceClient,
+      targetPrincipal: impersonate,     // e.g. target-sa@project.iam.gserviceaccount.com
+      delegates: [],                    // of een keten van SAs indien nodig
+      lifetime: 3600,
+      targetScopes: [SHEETS_SCOPE]      // eventueel ook DRIVE_SCOPE erbij
+    });
 
-  // Cruciaal: geef SCOPES óók door in het impersonation-object
-  const client = impersonate
-    ? await auth.getClient({
-        impersonateServiceAccount: impersonate,
-        scopes: SCOPES,
-      })
-    : await auth.getClient({ scopes: SCOPES });
-
-  // Sanity: forceer token nu, zodat scope-problemen meteen boven water komen
-  if (typeof auth.getAccessToken === 'function') {
-    await auth.getAccessToken();
+    return google.sheets({ version: 'v4', auth: impersonated });
   }
 
-  return google.sheets({ version: 'v4', auth: client });
+ // Zonder impersonation: directe SA key (of ADC) met scopes
+  const directAuth = new GoogleAuth({
+    keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS, // of laat weg voor pure ADC
+    scopes: [SHEETS_SCOPE]
+  });
+  return google.sheets({ version: 'v4', auth: directAuth });
 }
+
+console.log(process.env.GOOGLE_IMPERSONATE_SERVICE_ACCOUNT ? '🔐 Using impersonation' : '🔐 Using direct SA/ADC');
+
 
 async function getSheetTitles(sheets) {
   const resp = await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID });
@@ -275,17 +275,24 @@ async function nodeFetchJson(url) {
   try {
     const res = await fetch(url, {
       headers: {
-        'accept': 'application/json, text/plain;q=0.8, */*;q=0.5',
-        'user-agent': 'Mozilla/5.0 KNCB-Matchcentre', // vriendelijk UA
+        accept: "application/json, text/plain;q=0.8, */*;q=0.5",
+        "user-agent": "Mozilla/5.0 KNCB-Matchcentre", // vriendelijk UA
       },
     });
     const text = await res.text();
-    if (!res.ok) return { __error: `HTTP ${res.status}`, __head: text.slice(0, 220) };
+    if (!res.ok)
+      return { __error: `HTTP ${res.status}`, __head: text.slice(0, 220) };
     // JSON guard
     const h = text.trim().charAt(0);
-    if (h !== '{' && h !== '[') return { __error: 'Non-JSON response', __head: text.slice(0, 220) };
-    try { return JSON.parse(text); } catch (e) {
-      return { __error: `JSON parse error: ${e.message}`, __head: text.slice(0, 220) };
+    if (h !== "{" && h !== "[")
+      return { __error: "Non-JSON response", __head: text.slice(0, 220) };
+    try {
+      return JSON.parse(text);
+    } catch (e) {
+      return {
+        __error: `JSON parse error: ${e.message}`,
+        __head: text.slice(0, 220),
+      };
     }
   } catch (e) {
     return { __error: `Fetch failed: ${e.message}` };
@@ -297,25 +304,41 @@ async function pageFetchJsonWithRetry(page, url, { refPageUrl, label }) {
     const result = await page.evaluate(async (u) => {
       try {
         const res = await fetch(u, {
-          credentials: 'include',
+          credentials: "include",
           headers: {
-            'accept': 'application/json, text/plain;q=0.8, */*;q=0.5',
-            'x-requested-with': 'XMLHttpRequest'
+            accept: "application/json, text/plain;q=0.8, */*;q=0.5",
+            "x-requested-with": "XMLHttpRequest",
           },
-          mode: 'cors',
+          mode: "cors",
         });
-        const ct = res.headers.get('content-type') || '';
+        const ct = res.headers.get("content-type") || "";
         const text = await res.text();
-        if (!res.ok) return { __error: `HTTP ${res.status}`, __status: res.status, __head: text.slice(0, 220) };
+        if (!res.ok)
+          return {
+            __error: `HTTP ${res.status}`,
+            __status: res.status,
+            __head: text.slice(0, 220),
+          };
         if (!/application\/json/i.test(ct)) {
           const h = text.trim().charAt(0);
-          if (h !== '{' && h !== '[') return { __error: 'Non-JSON response', __head: text.slice(0, 220) };
-          try { return JSON.parse(text); } catch (e) {
-            return { __error: `JSON parse error: ${e.message}`, __head: text.slice(0, 220) };
+          if (h !== "{" && h !== "[")
+            return { __error: "Non-JSON response", __head: text.slice(0, 220) };
+          try {
+            return JSON.parse(text);
+          } catch (e) {
+            return {
+              __error: `JSON parse error: ${e.message}`,
+              __head: text.slice(0, 220),
+            };
           }
         }
-        try { return JSON.parse(text); } catch (e) {
-          return { __error: `JSON parse error: ${e.message}`, __head: text.slice(0, 220) };
+        try {
+          return JSON.parse(text);
+        } catch (e) {
+          return {
+            __error: `JSON parse error: ${e.message}`,
+            __head: text.slice(0, 220),
+          };
         }
       } catch (e) {
         return { __error: `Fetch failed: ${e.message}` };
@@ -325,14 +348,20 @@ async function pageFetchJsonWithRetry(page, url, { refPageUrl, label }) {
     if (!result?.__error) return result;
 
     const code = Number(result.__status || 0);
-    const transient = [401, 403, 408, 420, 429, 500, 502, 503, 504].includes(code);
-    console.warn(`⚠️ [attempt ${attempt}/${RETRY_MAX}] ${label ?? ''} ${url} -> ${result.__error}${result.__head ? ` | head=${result.__head}` : ''}`);
+    const transient = [401, 403, 408, 420, 429, 500, 502, 503, 504].includes(
+      code
+    );
+    console.warn(
+      `⚠️ [attempt ${attempt}/${RETRY_MAX}] ${label ?? ""} ${url} -> ${
+        result.__error
+      }${result.__head ? ` | head=${result.__head}` : ""}`
+    );
 
     // Fallback met Node-fetch op 401/403 (soms stricter per browser/cookie)
     if (USE_NODE_FETCH_ON_401 && (code === 401 || code === 403)) {
       const alt = await nodeFetchJson(url);
       if (!alt?.__error) {
-        console.log('🔁 Fallback via Node-fetch geslaagd voor', label ?? url);
+        console.log("🔁 Fallback via Node-fetch geslaagd voor", label ?? url);
         return alt;
       }
     }
@@ -341,7 +370,7 @@ async function pageFetchJsonWithRetry(page, url, { refPageUrl, label }) {
       // Sessie ververst houden: referrer herladen vóór volgende poging
       if (refPageUrl) {
         try {
-          await page.goto(refPageUrl, { waitUntil: 'networkidle0' });
+          await page.goto(refPageUrl, { waitUntil: "networkidle0" });
         } catch {}
       }
       const waitMs = backoffMs(attempt);
@@ -352,7 +381,7 @@ async function pageFetchJsonWithRetry(page, url, { refPageUrl, label }) {
   }
 }
 
-
+// Following code is not used, as a similar function with retries is used (pageFetchJsonWithRetries)
 async function pageFetchJson(page, url) {
   const result = await page.evaluate(async (u) => {
     try {
@@ -444,7 +473,8 @@ async function pageFetchJson(page, url) {
             : ""
         );
         sheets = await getSheetsClient();
-        console.log("✅ Google Sheets auth OK");
+        await sheets.spreadsheets.get({ spreadsheetId: process.env.SPREADSHEET_ID });
+        console.log('✅ Sheets access ok (scopes & permissions)');
       } catch (e) {
         console.warn(
           "⚠️ Sheets init mislukt; ga verder zonder Sheets:",
@@ -479,7 +509,17 @@ async function pageFetchJson(page, url) {
 
     // Grades ophalen
     console.log("📥 Haal grades op…");
-    const gradesJson = await pageFetchJson(page, GRADES_URL.toString());
+    // const gradesJson = await pageFetchJson(page, GRADES_URL.toString());
+    // replace with retrying code
+    const gradesJson = await pageFetchJsonWithRetry(
+      page,
+      GRADES_URL.toString(),
+      {
+        refPageUrl: refPage,
+        label: "grades",
+      }
+    );
+
     if (gradesJson?.__error)
       throw new Error(`Grades endpoint error: ${gradesJson.__error}`);
     const gradesArrRaw = extractArray(gradesJson) || [];
@@ -564,7 +604,7 @@ async function pageFetchJson(page, url) {
 
     const masterRows = [];
 
-let processed = 0;
+    let processed = 0;
     for (const g of gradesArr) {
       // const gid = String(g?.id ?? g?.gradeId ?? '').trim();      Replaced by next line
       const gid = getGradeId(g);
@@ -592,9 +632,12 @@ let processed = 0;
         seasonId: seasonInGrade || SEASON_ID,
       });
       console.log("🌐 Fetch matches:", matchUrl);
-     
-      /* Deze sectie wordt vervangen door een aanroep van een functie met retries
-      const matchesJson = await pageFetchJson(page, matchUrl);
+
+      // Nieuwe functieaanroep
+      const matchesJson = await pageFetchJsonWithRetry(page, matchUrl, {
+        refPageUrl: refPage, // je eerder geopende MatchCentre-pagina
+        label: `grade ${gid}`,
+      });
       if (matchesJson?.__error) {
         const msg =
           `⚠️ Fout bij grade ${gid}: ${matchesJson.__error}` +
@@ -603,19 +646,6 @@ let processed = 0;
         await notifyTelegram(msg);
         continue;
       }
-*/
-// Nieuwe functieaanroep
-const matchesJson = await pageFetchJsonWithRetry(page, matchUrl, {
-  refPageUrl: refPage,                 // je eerder geopende MatchCentre-pagina
-  label: `grade ${gid}`,
-});
-if (matchesJson?.__error) {
-  const msg = `⚠️ Fout bij grade ${gid}: ${matchesJson.__error}` + (matchesJson.__head ? ` | head=${matchesJson.__head}` : '');
-  console.error(msg);
-  await notifyTelegram(msg);
-  continue;
-}
-
 
       const dataArr = extractArray(matchesJson);
       if (!Array.isArray(dataArr)) {
@@ -652,7 +682,7 @@ if (matchesJson?.__error) {
           console.warn(`⚠️ Kon ${sheetName}.csv niet schrijven:`, e.message);
         }
       }
-      if (process.env.VERBOSE === "1") {
+      if (VERBOSE >= 1) {
         console.log(
           "🔎 Auth route:",
           process.env.GOOGLE_IMPERSONATE_SERVICE_ACCOUNT
@@ -668,11 +698,16 @@ if (matchesJson?.__error) {
 
       masterRows.push(...rows);
       processed++;
-  if (REFRESH_REFERRER_EVERY > 0 && processed % REFRESH_REFERRER_EVERY === 0) {
-    console.log('🔄 Sessieverversing: referrer herladen…', refPage);
-    try { await page.goto(refPage, { waitUntil: 'networkidle0' }); } catch {}
-    await delay(SLOWDOWN_MS);
-  }
+      if (
+        REFRESH_REFERRER_EVERY > 0 &&
+        processed % REFRESH_REFERRER_EVERY === 0
+      ) {
+        console.log("🔄 Sessieverversing: referrer herladen…", refPage);
+        try {
+          await page.goto(refPage, { waitUntil: "networkidle0" });
+        } catch {}
+        await delay(SLOWDOWN_MS);
+      }
       await delay(SLOWDOWN_MS);
     }
 
