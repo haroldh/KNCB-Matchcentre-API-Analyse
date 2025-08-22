@@ -6,6 +6,7 @@ import puppeteer from 'puppeteer';
 import fs from 'fs';
 import { parse } from 'json2csv';
 import { google } from 'googleapis';
+import { GoogleAuth } from 'google-auth-library';
 import dotenv from 'dotenv';
 import axios from 'axios';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -50,7 +51,6 @@ const {
   SEASON_ID,
   RV_ID,
   SPREADSHEET_ID,
-  GOOGLE_APPLICATION_CREDENTIALS,
   TELEGRAM_BOT_TOKEN,
   TELEGRAM_CHAT_ID,
   CSV_OUTPUT,
@@ -77,13 +77,39 @@ async function notifyTelegram(text) {
 }
 
 // ---------- Google Sheets ----------
-async function getSheetsClient() {
+/*. Deze sectie wordt vervangen om gebruik te gaan maken van de Google Workflow identificatie
+async function getSheetsClient() {;
   const auth = new google.auth.GoogleAuth({
     keyFile: GOOGLE_APPLICATION_CREDENTIALS,
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
   });
   return google.sheets({ version: 'v4', auth });
 }
+  */
+
+// ---------------- Google Sheets client (ADC + optional impersonation) ----------------
+
+async function getSheetsClient() {
+  // ADC + optionele impersonation via env var
+  const impersonate = process.env.GOOGLE_IMPERSONATE_SERVICE_ACCOUNT || null;
+
+  const auth = new GoogleAuth({
+    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+  });
+
+  const client = impersonate
+    ? await auth.getClient({ impersonateServiceAccount: impersonate })
+    : await auth.getClient();
+
+  // optionele sanity check
+  if (typeof auth.getAccessToken === 'function') {
+    await auth.getAccessToken();
+  }
+
+  return google.sheets({ version: 'v4', auth: client });
+}
+
+
 
 async function getSheetTitles(sheets) {
   const resp = await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID });
@@ -272,23 +298,21 @@ async function pageFetchJson(page, url) {
       : null;
 */ // Vervangen door volgende sectie:
 let sheets = null;
-if (!DISABLE_SHEETS && SPREADSHEET_ID && GOOGLE_APPLICATION_CREDENTIALS) {
+if (process.env.DISABLE_SHEETS === '1') {
+  console.log('ℹ️ Sheets uitgeschakeld (DISABLE_SHEETS=1). CSV’s worden wel geschreven.');
+} else if (process.env.SPREADSHEET_ID) {
   try {
-    console.log('🔐 Init Google Sheets using', GOOGLE_APPLICATION_CREDENTIALS);
+    console.log('🔐 Init Google Sheets via ADC', process.env.GOOGLE_IMPERSONATE_SERVICE_ACCOUNT ? '(impersonation)' : '');
     sheets = await getSheetsClient();
-    // log het service account adres ter controle (zonder secrets)
-    try {
-      const raw = JSON.parse(fs.readFileSync(GOOGLE_APPLICATION_CREDENTIALS, 'utf8'));
-      if (raw?.client_email) console.log('🔑 Service account:', raw.client_email);
-      if (raw?.type) console.log('🔑 Credential type:', raw.type);
-    } catch {}
+    console.log('✅ Google Sheets auth OK');
   } catch (e) {
     console.warn('⚠️ Sheets init mislukt; ga verder zonder Sheets:', e.message);
     sheets = null;
   }
 } else {
-  console.log('ℹ️ Sheets uitgeschakeld (DISABLE_SHEETS=1 of ontbrekende env).');
+  console.log('ℹ️ Geen SPREADSHEET_ID gezet; ga verder zonder Sheets.');
 }
+
 
 
     console.log('🚀 Start puppeteer…');
@@ -428,6 +452,10 @@ if (VERBOSE >= 1 && gradesArr.length) {
           console.warn(`⚠️ Kon ${sheetName}.csv niet schrijven:`, e.message);
         }
       }
+if (process.env.VERBOSE === '1') {
+  console.log('🔎 Auth route:',
+    process.env.GOOGLE_IMPERSONATE_SERVICE_ACCOUNT ? 'ADC + SA impersonation' : 'ADC direct');
+}
 
       if (sheets && rows.length) {
         await writeValues(sheets, sheetName, rows);
