@@ -26,22 +26,25 @@ MATCH_REFERRER_URL=https://matchcentre.kncb.nl/matches/
 GRADES_REFERRER_URL=https://matchcentre.kncb.nl/matches/
 SEASONS_REFERRER_URL=https://matchcentre.kncb.nl/seasons/
 
-// JSON endpoints (Resultsvault)
+// JSON endpoints (Resultsvault) — LET OP: behoud de trailing slash in /matches/
 MATCH_JSON_API_ENDPOINT=https://api.resultsvault.co.uk/rv/134453/matches/?apiid=1002&action=ors&maxrecs=1000&strmflg=1
 GRADES_JSON_API_ENDPOINT=https://api.resultsvault.co.uk/rv/134453/grades/?apiid=1002&seasonid=19
-MATCHSTATUS_JSON_API_ENDPOINT=   # (optioneel)
+MATCHSTATUS_JSON_API_ENDPOINT=
 SEASONS_JSON_API_ENDPOINT=https://api.resultsvault.co.uk/rv/134453/seasons/?apiid=1002
 
+// Clubscript-vereiste
+IAS_API_KEY=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx   # ← zet hier je echte waarde in
+
 // Optioneel gedrag
-SLOWDOWN_MS=2000
+SLOWDOWN_MS=200      # clubscript gebruikt ~200ms
 PUPPETEER_TIMEOUT_MS=30000
-RETRY_MAX=4
-RETRY_BASE_DELAY_MS=900
-RETRY_JITTER_MS=300
-REFRESH_REFERRER_EVERY=5
-USE_NODE_FETCH_ON_401=1
+RETRY_MAX=2          # bij 401 na warm-up nog 1 retry is genoeg
+RETRY_BASE_DELAY_MS=600
+RETRY_JITTER_MS=250
+REFRESH_REFERRER_EVERY=8
+USE_NODE_FETCH_ON_401=0  # niet nodig als warm-up + IAS goed staan
 VERBOSE=1
-GRADE_IDS=73942,73943          # optioneel filter, comma-separated
+GRADE_IDS=           # optioneel filter, comma-separated
 
 // Sheets via SA of ADC; impersonation optioneel
 GOOGLE_APPLICATION_CREDENTIALS=./credentials.json
@@ -56,24 +59,24 @@ const {
   MATCH_JSON_API_ENDPOINT,
   GRADES_JSON_API_ENDPOINT,
   SEASONS_JSON_API_ENDPOINT,
-  MATCHSTATUS_JSON_API_ENDPOINT,
 
   SEASON_ID,
   SPREADSHEET_ID,
   TELEGRAM_BOT_TOKEN,
   TELEGRAM_CHAT_ID,
   GRADE_IDS,
+  IAS_API_KEY,
 } = process.env;
 
-const SLOWDOWN_MS = Number(process.env.SLOWDOWN_MS ?? 1200);
+const SLOWDOWN_MS = Number(process.env.SLOWDOWN_MS ?? 200);
 const TIMEOUT_MS = Number(process.env.PUPPETEER_TIMEOUT_MS ?? 30000);
 const VERBOSE = Number(process.env.VERBOSE ?? 0);
 const DISABLE_SHEETS = String(process.env.DISABLE_SHEETS ?? "").toLowerCase() === "1";
-const RETRY_MAX = Number(process.env.RETRY_MAX ?? 4);
-const RETRY_BASE_DELAY_MS = Number(process.env.RETRY_BASE_DELAY_MS ?? 1200);
-const RETRY_JITTER_MS = Number(process.env.RETRY_JITTER_MS ?? 400);
-const REFRESH_REFERRER_EVERY = Number(process.env.REFRESH_REFERRER_EVERY ?? 5);
-const USE_NODE_FETCH_ON_401 = String(process.env.USE_NODE_FETCH_ON_401 ?? "1") === "1";
+const RETRY_MAX = Number(process.env.RETRY_MAX ?? 2);
+const RETRY_BASE_DELAY_MS = Number(process.env.RETRY_BASE_DELAY_MS ?? 600);
+const RETRY_JITTER_MS = Number(process.env.RETRY_JITTER_MS ?? 250);
+const REFRESH_REFERRER_EVERY = Number(process.env.REFRESH_REFERRER_EVERY ?? 8);
+const USE_NODE_FETCH_ON_401 = String(process.env.USE_NODE_FETCH_ON_401 ?? "0") === "1";
 const SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
 
 const jitter = (ms) => ms + Math.floor(Math.random() * RETRY_JITTER_MS);
@@ -98,11 +101,8 @@ async function getSheetsClient() {
   const impersonate = process.env.GOOGLE_IMPERSONATE_SERVICE_ACCOUNT;
 
   if (impersonate && impersonate.trim()) {
-    // 1) bron-cred (moet cloud-platform scope hebben om IAMCredentials aan te roepen)
     const sourceAuth = new GoogleAuth({ scopes: ["https://www.googleapis.com/auth/cloud-platform"] });
     const sourceClient = await sourceAuth.getClient();
-
-    // 2) impersonated client met expliciete targetScopes (Sheets)
     const impersonated = new Impersonated({
       sourceClient,
       targetPrincipal: impersonate,
@@ -113,7 +113,6 @@ async function getSheetsClient() {
     return google.sheets({ version: "v4", auth: impersonated });
   }
 
-  // Zonder impersonation: directe SA key (of pure ADC) met scopes
   const directAuth = new GoogleAuth({
     keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
     scopes: [SHEETS_SCOPE],
@@ -168,62 +167,11 @@ function uniqueFields(rows) {
   return [...set];
 }
 
-// ——— helpers: cookies & headers ———
-function buildCookieHeader(cookies) {
-  // cookies: array from browserContext.cookies()
-  if (!Array.isArray(cookies) || !cookies.length) return "";
-  return cookies
-    .filter(c => c && c.name && typeof c.value !== "undefined")
-    .map(c => `${c.name}=${c.value}`)
-    .join("; ");
-}
-
 function defaultUa() {
-  return "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-       + "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+  return "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 }
-
-async function logCookies(page, label) {
-  try {
-    const cookies = await page.browserContext().cookies();
-    console.log(`🍪 ${label}: ${cookies.map(c => c.name).join(',')}`);
-  } catch (e) {
-    console.warn(`🍪 ${label}: kon cookies niet lezen: ${e.message}`);
-  }
-}
-
-// Haal entity/tenant id uit een grade-object.
-// Resultsvault-grade payloads bevatten vaak een entiteit/associatie id.
-// We proberen algemene varianten; loggen als we iets vinden.
-function getEntityIdFromGrade(g) {
-  const cands = [
-    g?.entity_id, g?.entityId, g?.association_id, g?.associationId,
-    g?.org_id, g?.orgId, g?.entity?.id, g?.Association?.Id
-  ];
-  for (const c of cands) {
-    if (c != null && String(c).trim() !== "") return String(c).trim();
-  }
-  return ""; // onbekend -> val terug op RV_ID uit .env
-}
-
-// Bouw base RV endpoint dynamisch per entity.
-// Vervangt het padsegment rv/<...>/ door de opgegeven entityId.
-function buildEntityScopedBase(baseUrl, entityIdFallback, entityIdMaybe) {
-  const u = new URL(baseUrl.toString());
-  const path = u.pathname.split("/").filter(Boolean); // ['rv','134453','matches',...]
-  const idx = path.indexOf("rv");
-  if (idx !== -1 && path.length > idx + 1) {
-    // vervang huidige rv/<id> door rv/<entityId>
-    const newId = (entityIdMaybe && /^\d+$/.test(entityIdMaybe)) ? entityIdMaybe : entityIdFallback;
-    path[idx + 1] = String(newId);
-    u.pathname = "/" + path.join("/");
-  }
-  return u;
-}
-
 
 function flattenObject(obj) {
-  // Geneste arrays/objects → JSON-string; voorkomt "list_value/struct_value" errors in Sheets
   const out = {};
   for (const [k, v] of Object.entries(obj)) {
     out[k] = v !== null && typeof v === "object" ? JSON.stringify(v) : v;
@@ -244,7 +192,6 @@ function extractArray(any) {
 }
 
 function pickReferrer() {
-  // volgorde: expliciete referrers → fallback naar matches/
   const candidates = [
     MATCH_REFERRER_URL,
     GRADES_REFERRER_URL,
@@ -276,7 +223,7 @@ function normalizeRvEndpoint(name, value) {
   return u;
 }
 
-// Bouw per-grade match-URL
+// Bouw per-grade match-URL — base moet een trailing slash hebben; laat .env zo staan
 function buildMatchUrl(baseUrl, { gradeId, seasonId }) {
   const u = new URL(baseUrl.toString());
   u.searchParams.delete("gradeid");
@@ -307,7 +254,6 @@ function getSeasonIdFromGrade(g) {
   return "";
 }
 
-// Kleine helper om CSV te schrijven (met dynamische headers)
 function writeCsv(filename, rows) {
   if (!rows?.length) return;
   try {
@@ -320,141 +266,57 @@ function writeCsv(filename, rows) {
   }
 }
 
-// ——— Node-fallback die exact lijkt op browsercontext (Origin/Referer/Cookie/UA) ———
-async function nodeFetchJsonWithCookies(url, {
-  referer,
-  origin,
-  cookieHeader,
-  userAgent = defaultUa(),
-} = {}) {
+// ---------- NIEUW: warm-up per grade (zoals clubscript via iframe doet) ----------
+async function warmupSession(page, { entityId, gradeId, seasonId }) {
+  const warmUrl = `https://matchcentre.kncb.nl/matches/?entity=${entityId}&grade=${gradeId}&season=${seasonId}`;
   try {
-    const res = await fetch(url, {
-      // we sturen bewust dezelfde headers die de SPA zou sturen
-      headers: {
-        "accept": "application/json, text/plain;q=0.8, */*;q=0.5",
-        "user-agent": userAgent,
-        ...(origin ? { "origin": origin } : {}),
-        ...(referer ? { "referer": referer } : {}),
-        ...(cookieHeader ? { "cookie": cookieHeader } : {}),
-        "cache-control": "no-cache",
-        "pragma": "no-cache",
-        "x-requested-with": "XMLHttpRequest",
-      },
-      redirect: "follow",
-    });
-
-    const text = await res.text();
-    if (!res.ok) return { __error: `HTTP ${res.status}`, __head: text.slice(0, 220) };
-
-    const ct = (res.headers.get("content-type") || "").toLowerCase();
-    if (!ct.includes("application/json")) {
-      const h = text.trim().charAt(0);
-      if (h !== "{" && h !== "[") return { __error: "Non-JSON response", __head: text.slice(0, 220) };
-    }
-    try {
-      return JSON.parse(text);
-    } catch (e) {
-      return { __error: `JSON parse error: ${e.message}`, __head: text.slice(0, 220) };
-    }
+    const warm = await page.browser().newPage();
+    await warm.setViewport({ width: 160, height: 100 });
+    await warm.goto(warmUrl, { waitUntil: "domcontentloaded", timeout: 15000 });
+    await warm.waitForTimeout(1000);
+    await warm.close();
+    if (VERBOSE >= 1) console.log(`🔥 warmup ok for grade ${gradeId}`);
   } catch (e) {
-    return { __error: `Fetch failed: ${e.message}` };
+    console.warn(`🔥 warmup failed for grade ${gradeId}: ${e.message}`);
   }
 }
 
-// 🌐 Versterkte fetch in page-context met credentials en backoff.
-// - Gebruik 'referrer' i.p.v. poging tot manueel Origin/Referer headers zetten
-// - Op 401/403: referrer herladen (sessie reseeden) en retry
-// - Node fallback met cookies uit BrowserContext
-async function pageFetchJsonWithRetry(page, url, { refPageUrl, label }) {
-  for (let attempt = 1; attempt <= RETRY_MAX; attempt++) {
-    const result = await page.evaluate(async (u, ref) => {
-      try {
-        const res = await fetch(u, {
-          credentials: "include",
-          referrer: ref,
-          referrerPolicy: "strict-origin-when-cross-origin",
-          headers: {
-            accept: "application/json, text/plain;q=0.8, */*;q=0.5",
-            "x-requested-with": "XMLHttpRequest",
-            "cache-control": "no-cache",
-            pragma: "no-cache",
-          },
-          mode: "cors",
-        });
-        const ct = res.headers.get("content-type") || "";
-        const text = await res.text();
-        if (!res.ok) return { __error: `HTTP ${res.status}`, __status: res.status, __head: text.slice(0, 220) };
-
-        if (!/application\/json/i.test(ct)) {
-          const h = text.trim().charAt(0);
-          if (h !== "{" && h !== "[") return { __error: "Non-JSON response", __head: text.slice(0, 220) };
-          try { return JSON.parse(text); } catch (e) { return { __error: `JSON parse error: ${e.message}`, __head: text.slice(0, 220) }; }
-        }
-        try { return JSON.parse(text); } catch (e) { return { __error: `JSON parse error: ${e.message}`, __head: text.slice(0, 220) }; }
-      } catch (e) {
-        return { __error: `Fetch failed: ${e.message}` };
-      }
-    }, url, refPageUrl);
-
-    if (!result?.__error) return result;
-
-    const code = Number(result.__status || 0);
-    const transient = [401, 403, 408, 420, 429, 500, 502, 503, 504].includes(code);
-    console.warn(
-      `⚠️ [attempt ${attempt}/${RETRY_MAX}] ${label ?? ""} ${url} -> ${result.__error}${
-        result.__head ? ` | head=${result.__head}` : ""
-      }`
-    );
-
-    // 401/403: Node-fallback met cookie header uit BrowserContext (zelfde origin als API)
-    if (USE_NODE_FETCH_ON_401 && (code === 401 || code === 403)) {
-      try {
-        const apiOrigin = new URL(url).origin;
-        const apiCookies = await page.browserContext().cookies(apiOrigin);
-        const cookieHeader = buildCookieHeader(apiCookies);
-        const origin = new URL(refPageUrl).origin;
-
-        if (VERBOSE >= 1) {
-          console.log(`🍪 Node-fallback cookies (${apiCookies.length}):`, apiCookies.map(c => c.name).join(","));
-        }
-
-        const alt = await nodeFetchJsonWithCookies(url, {
-          referer: refPageUrl,
-          origin,
-          cookieHeader,
-          userAgent: defaultUa(),
-        });
-
-        if (!alt?.__error) {
-          console.log("🔁 Fallback via Node-fetch (met cookies) geslaagd:", label ?? url);
-          return alt;
-        } else {
-          console.warn("⚠️ Node-fallback ook mislukt:", alt.__error, alt.__head || "");
-        }
-      } catch (e) {
-        console.warn("⚠️ Node-fallback exception:", e.message);
-      }
+// ---------- In-page fetch met IAS header + referrer ----------
+async function fetchJsonInPage(page, url, refPageUrl, label) {
+  return await page.evaluate(async (u, ref, ias) => {
+    try {
+      const res = await fetch(u, {
+        credentials: "include",
+        referrer: ref,
+        referrerPolicy: "strict-origin-when-cross-origin", // Chrome default; expliciet voor duidelijkheid
+        headers: {
+          "Accept": "application/json, text/plain;q=0.8, */*;q=0.5",
+          "X-IAS-API-REQUEST": ias,               // ← essentieel; clubscript stuurt deze altijd mee
+          "x-requested-with": "XMLHttpRequest",
+          "cache-control": "no-cache",
+          "pragma": "no-cache",
+        },
+        method: "GET",
+        mode: "cors",
+      });
+      const text = await res.text();
+      if (!res.ok) return { __error: `HTTP ${res.status}`, __status: res.status, __head: text.slice(0, 220) };
+      try { return JSON.parse(text); }
+      catch (e) { return { __error: `JSON parse error: ${e.message}`, __head: text.slice(0, 220) }; }
+    } catch (e) {
+      return { __error: `Fetch failed: ${e.message}` };
     }
-
-    if (attempt < RETRY_MAX && transient) {
-      // Sessieverversing vóór retry
-      if (refPageUrl) {
-        try { await page.goto(refPageUrl, { waitUntil: "networkidle0" }); } catch {}
-      }
-      const waitMs = backoffMs(attempt);
-      await delay(waitMs);
-      continue;
-    }
-    return result; // definitieve fout
-  }
+  }, url, refPageUrl, IAS_API_KEY);
 }
-
 
 // ---------- MAIN ----------
 (async () => {
   let browser;
   try {
-    // Normaliseer endpoints
+    if (!IAS_API_KEY) {
+      throw new Error("IAS_API_KEY ontbreekt in .env (X-IAS-API-REQUEST verplicht).");
+    }
+
     const GRADES_URL = normalizeRvEndpoint("GRADES_JSON_API_ENDPOINT", GRADES_JSON_API_ENDPOINT);
     const MATCH_URL = normalizeRvEndpoint("MATCH_JSON_API_ENDPOINT", MATCH_JSON_API_ENDPOINT);
     const SEASONS_URL = SEASONS_JSON_API_ENDPOINT ? normalizeRvEndpoint("SEASONS_JSON_API_ENDPOINT", SEASONS_JSON_API_ENDPOINT) : null;
@@ -467,10 +329,7 @@ async function pageFetchJsonWithRetry(page, url, { refPageUrl, label }) {
       console.log("ℹ️ Sheets uitgeschakeld (DISABLE_SHEETS=1). CSV’s worden wel geschreven.");
     } else if (SPREADSHEET_ID) {
       try {
-        console.log(
-          "🔐 Init Google Sheets via ADC",
-          process.env.GOOGLE_IMPERSONATE_SERVICE_ACCOUNT ? "(impersonation)" : ""
-        );
+        console.log("🔐 Init Google Sheets via ADC", process.env.GOOGLE_IMPERSONATE_SERVICE_ACCOUNT ? "(impersonation)" : "");
         sheets = await getSheetsClient();
         await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID });
         console.log("✅ Google Sheets auth OK");
@@ -482,7 +341,7 @@ async function pageFetchJsonWithRetry(page, url, { refPageUrl, label }) {
       console.log("ℹ️ Geen SPREADSHEET_ID gezet; ga verder zonder Sheets.");
     }
 
-    // Puppeteer start
+    // Puppeteer
     console.log("🚀 Start puppeteer…");
     browser = await puppeteer.launch({
       headless: true,
@@ -490,36 +349,36 @@ async function pageFetchJsonWithRetry(page, url, { refPageUrl, label }) {
     });
     const page = await browser.newPage();
     page.setDefaultNavigationTimeout(TIMEOUT_MS);
-    // Stabiele UA/headers voor strengere origin checks
-    await page.setUserAgent(
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-    );
-    await page.setExtraHTTPHeaders({
-      "Accept-Language": "en-US,en;q=0.9,nl;q=0.8",
+    await page.setUserAgent(defaultUa());
+    await page.setExtraHTTPHeaders({ "Accept-Language": "en-US,en;q=0.9,nl;q=0.8" });
+
+    page.on("console", (msg) => console.log("PAGE →", msg.text()));
+    page.on("requestfailed", (req) => {
+      const u = req.url();
+      if (/googletagmanager|google-analytics|gtag/i.test(u)) return;
+      console.log("REQ FAIL →", req.failure()?.errorText, u);
     });
 
-    page.on("console", (msg) => console.log("PAGE LOG →", msg.text()));
-    page.on("requestfailed", (req) => console.log("PAGE REQ FAIL →", req.failure()?.errorText, req.url()));
-
-    // Referrer openen
+    // Referrer openen + korte warm-up (root)
     console.log("📥 Open referrer pagina…", refPage);
     await page.goto(refPage, { waitUntil: "networkidle0" });
-    try {
-  const ck1 = await page.browserContext().cookies(new URL("https://api.resultsvault.co.uk").origin);
-  console.log("🍪 API cookie names (init):", ck1.map(c => c.name).join(","));
-} catch {}
+
+    if (process.env.API_URL) {
+      console.log("📥 Warm-up API call…", process.env.API_URL);
+      await fetchJsonInPage(page, process.env.API_URL, refPage, "warmup");
+    }
 
     await delay(SLOWDOWN_MS);
 
-    // 1) GRADES ophalen + meteen wegschrijven naar GRADES-tab en GRADES.csv
+    // 1) GRADES
     console.log("📥 Haal grades op…");
-    const gradesJson = await pageFetchJsonWithRetry(page, GRADES_URL.toString(), { refPageUrl: refPage, label: "grades" });
+    const gradesJson = await fetchJsonInPage(page, GRADES_URL.toString(), refPage, "grades");
     if (gradesJson?.__error) throw new Error(`Grades endpoint error: ${gradesJson.__error}`);
 
     const gradesArrRaw = extractArray(gradesJson) || [];
     console.log(`▶ Gevonden ${gradesArrRaw.length} raw grades`);
 
-    // → NEW: ook GRADES naar sheet + CSV (flattened)
+    // GRADES → sheet + CSV (flatten)
     const gradesRows = gradesArrRaw.map(flattenObject);
     if (gradesRows.length) {
       writeCsv("GRADES.csv", gradesRows);
@@ -530,13 +389,12 @@ async function pageFetchJsonWithRetry(page, url, { refPageUrl, label }) {
       }
     }
 
-    // Optioneel filter op GRADE_IDS
+    // Optioneel filter
     const onlyIds = (GRADE_IDS || "")
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean)
       .map((x) => String(x));
-
     if (VERBOSE >= 1) console.log("🔎 Filter GRADE_IDS =", onlyIds);
 
     const gradesArr = gradesArrRaw.filter((g) => {
@@ -549,15 +407,13 @@ async function pageFetchJsonWithRetry(page, url, { refPageUrl, label }) {
     });
 
     console.log(
-      `🧮 Te verwerken grades: ${gradesArr.length}${
-        onlyIds.length ? ` (gefilterd uit ${gradesArrRaw.length})` : ""
-      }`
+      `🧮 Te verwerken grades: ${gradesArr.length}${onlyIds.length ? ` (gefilterd uit ${gradesArrRaw.length})` : ""}`
     );
 
     const masterRows = [];
     let processed = 0;
 
-    // 2) Per grade wedstrijden ophalen
+    // 2) Per grade wedstrijden
     for (const g of gradesArr) {
       const gid = getGradeId(g);
       const seasonInGrade = getSeasonIdFromGrade(g) || SEASON_ID || "";
@@ -566,37 +422,28 @@ async function pageFetchJsonWithRetry(page, url, { refPageUrl, label }) {
       const sheetName = `Grade_${gid}`;
       if (sheets) await ensureSheet(sheets, sheetName);
 
-      const entityId = getEntityIdFromGrade(g);             // ← nieuw
-const scopedBase = buildEntityScopedBase(MATCH_URL,   // ← nieuw
-                    process.env.RV_ID, entityId);
-const matchUrl = buildMatchUrl(scopedBase, {          // ← aangepast: scopedBase i.p.v. MATCH_URL
-  gradeId: gid,
-  seasonId: seasonInGrade || SEASON_ID
-});
-console.log(`🏷️ entityId=${entityId || process.env.RV_ID} → ${matchUrl}`);
+      // Warm-up per grade (zoals clubscript via iframe)
+      const entityId = String(process.env.RV_ID || "134453");
+      await warmupSession(page, { entityId, gradeId: gid, seasonId: seasonInGrade || SEASON_ID });
 
+      // Bouw matches-URL en fetch IN PAGE met IAS header + referrer
+      const matchUrl = buildMatchUrl(MATCH_URL, { gradeId: gid, seasonId: seasonInGrade || SEASON_ID });
+      console.log("🌐 Fetch matches:", matchUrl);
 
-      const matchesJson = await pageFetchJsonWithRetry(page, matchUrl, {
-        refPageUrl: refPage,
-        label: `grade ${gid}`,
-      });
+      let matchesJson = await fetchJsonInPage(page, matchUrl, refPage, `grade ${gid}`);
+      if (matchesJson?.__error && String(matchesJson.__error).includes("HTTP 401")) {
+        console.log("🔄 401: nogmaals warm-up en retry…");
+        await warmupSession(page, { entityId, gradeId: gid, seasonId: seasonInGrade || SEASON_ID });
+        await delay(250);
+        matchesJson = await fetchJsonInPage(page, matchUrl, refPage, `grade ${gid} (retry)`);
+      }
 
-if (matchesJson?.__error) {
-  const msg = `⚠️ Fout bij grade ${gid} (entity=${entityId || process.env.RV_ID}): ${matchesJson.__error}${
-    matchesJson.__head ? ` | head=${matchesJson.__head}` : ""
-  }`;
-  console.error(msg);
-  await notifyTelegram(msg);
-  // Bonus: bij 401 eenmalig "hard refresh" van de referrer proberen
-  if (String(matchesJson.__error).includes("HTTP 401")) {
-    try {
-      console.log("🔄 401: hard refresh van referrer & korte pauze…");
-      await page.goto(refPage, { waitUntil: "networkidle0" });
-      await delay(1500);
-    } catch {}
-  }
-  continue;
-}
+      if (matchesJson?.__error) {
+        const msg = `⚠️ Fout bij grade ${gid}: ${matchesJson.__error}${matchesJson.__head ? ` | head=${matchesJson.__head}` : ""}`;
+        console.error(msg);
+        await notifyTelegram(msg);
+        continue;
+      }
 
       const dataArr = extractArray(matchesJson);
       if (!Array.isArray(dataArr)) {
@@ -618,7 +465,6 @@ if (matchesJson?.__error) {
         return flat;
       });
 
-      // Per-grade CSV en sheet
       if (rows.length) {
         writeCsv(`${sheetName}.csv`, rows);
         if (sheets) {
@@ -629,25 +475,19 @@ if (matchesJson?.__error) {
       }
 
       processed++;
-      // Sessieverversing (cookies/tokens) na elke N grades
       if (REFRESH_REFERRER_EVERY > 0 && processed % REFRESH_REFERRER_EVERY === 0) {
         console.log("🔄 Sessieverversing: referrer herladen…", refPage);
-        try {
-await logCookies(page, 'before refresh');
-await page.goto(refPage, { waitUntil: 'networkidle0' });
-await logCookies(page, 'after refresh');
-        } catch {}
+        try { await page.goto(refPage, { waitUntil: "networkidle0" }); } catch {}
         await delay(SLOWDOWN_MS);
-      
       }
 
       await delay(SLOWDOWN_MS);
     }
 
-    // 3) MASTER schrijven (alle grades samengevoegd)
+    // 3) MASTER
     if (masterRows.length) {
       console.log(`\n📊 MASTER opbouwen: ${masterRows.length} rijen`);
-      writeCsv("MASTER.csv", masterRows);                // ← alleen MASTER.csv, niet meer matches.csv
+      writeCsv("MASTER.csv", masterRows);
       if (sheets) {
         await ensureSheet(sheets, "MASTER");
         await writeValues(sheets, "MASTER", masterRows);
