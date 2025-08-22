@@ -1,5 +1,6 @@
 # Dependency directory
 node_modules/
+./node_modules/*
 
 # Debug log files
 npm-debug.log*
@@ -60,3 +61,4 @@ temp/
 
 # Mac metadata files
 Icon?
+node_modules

@@ -104,23 +104,27 @@ async function getSheetsClient() {;
 // ---------------- Google Sheets client (ADC + optional impersonation) ----------------
 
 async function getSheetsClient() {
-  // ADC + optionele impersonation via env var
   const impersonate = process.env.GOOGLE_IMPERSONATE_SERVICE_ACCOUNT || null;
 
-  const auth = new GoogleAuth({
-    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
-  });
+  // Belangrijk: scopes hier definiëren
+  const SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
 
+  const auth = new GoogleAuth({ scopes: SCOPES });
+
+  // Cruciaal: geef SCOPES óók door in het impersonation-object
   const client = impersonate
-    ? await auth.getClient({ impersonateServiceAccount: impersonate })
-    : await auth.getClient();
+    ? await auth.getClient({
+        impersonateServiceAccount: impersonate,
+        scopes: SCOPES,
+      })
+    : await auth.getClient({ scopes: SCOPES });
 
-  // optionele sanity check
-  if (typeof auth.getAccessToken === "function") {
+  // Sanity: forceer token nu, zodat scope-problemen meteen boven water komen
+  if (typeof auth.getAccessToken === 'function') {
     await auth.getAccessToken();
   }
 
-  return google.sheets({ version: "v4", auth: client });
+  return google.sheets({ version: 'v4', auth: client });
 }
 
 async function getSheetTitles(sheets) {
