@@ -361,48 +361,36 @@ async function nodeFetchJsonWithCookies(url, {
   }
 }
 
-
-// 🌐 Versterkte fetch in page-context met credentials, Origin/Referer en backoff.
-//  - Op 401/403: referrer herladen (sessie reseeden) en retry
+// 🌐 Versterkte fetch in page-context met credentials en backoff.
+// - Gebruik 'referrer' i.p.v. poging tot manueel Origin/Referer headers zetten
+// - Op 401/403: referrer herladen (sessie reseeden) en retry
+// - Node fallback met cookies uit BrowserContext
 async function pageFetchJsonWithRetry(page, url, { refPageUrl, label }) {
   for (let attempt = 1; attempt <= RETRY_MAX; attempt++) {
     const result = await page.evaluate(async (u, ref) => {
       try {
-        const origin = new URL(ref).origin;
-        const resp = await fetch(u, {
+        const res = await fetch(u, {
           credentials: "include",
-          // Gebruik fetch 'referrer' i.p.v. header 'Referer' (header wordt door browser genegeerd/set)
           referrer: ref,
-          referrerPolicy: "origin-when-cross-origin",
+          referrerPolicy: "strict-origin-when-cross-origin",
           headers: {
             accept: "application/json, text/plain;q=0.8, */*;q=0.5",
             "x-requested-with": "XMLHttpRequest",
-            // Sommige backends checken 'Origin' streng bij credentials:
-            Origin: origin,
-            "Cache-Control": "no-cache",
-            Pragma: "no-cache",
+            "cache-control": "no-cache",
+            pragma: "no-cache",
           },
           mode: "cors",
         });
-        const ct = resp.headers.get("content-type") || "";
-        const text = await resp.text();
-        if (!resp.ok) {
-          return { __error: `HTTP ${resp.status}`, __status: resp.status, __head: text.slice(0, 220) };
-        }
+        const ct = res.headers.get("content-type") || "";
+        const text = await res.text();
+        if (!res.ok) return { __error: `HTTP ${res.status}`, __status: res.status, __head: text.slice(0, 220) };
+
         if (!/application\/json/i.test(ct)) {
           const h = text.trim().charAt(0);
           if (h !== "{" && h !== "[") return { __error: "Non-JSON response", __head: text.slice(0, 220) };
-          try {
-            return JSON.parse(text);
-          } catch (e) {
-            return { __error: `JSON parse error: ${e.message}`, __head: text.slice(0, 220) };
-          }
+          try { return JSON.parse(text); } catch (e) { return { __error: `JSON parse error: ${e.message}`, __head: text.slice(0, 220) }; }
         }
-        try {
-          return JSON.parse(text);
-        } catch (e) {
-          return { __error: `JSON parse error: ${e.message}`, __head: text.slice(0, 220) };
-        }
+        try { return JSON.parse(text); } catch (e) { return { __error: `JSON parse error: ${e.message}`, __head: text.slice(0, 220) }; }
       } catch (e) {
         return { __error: `Fetch failed: ${e.message}` };
       }
@@ -418,28 +406,27 @@ async function pageFetchJsonWithRetry(page, url, { refPageUrl, label }) {
       }`
     );
 
-    // Fallback: Node-fetch met Cookie-header uit BrowserContext (401/403)
+    // 401/403: Node-fallback met cookie header uit BrowserContext (zelfde origin als API)
     if (USE_NODE_FETCH_ON_401 && (code === 401 || code === 403)) {
       try {
-        const ctx = page.browserContext();
-        const apiCookies = await ctx.cookies(new URL(u).origin);
+        const apiOrigin = new URL(url).origin;
+        const apiCookies = await page.browserContext().cookies(apiOrigin);
         const cookieHeader = buildCookieHeader(apiCookies);
-        const origin = new URL(ref).origin;
+        const origin = new URL(refPageUrl).origin;
 
         if (VERBOSE >= 1) {
-          console.log(`🍪 Node-fallback cookies (${apiCookies.length}):`,
-            apiCookies.map(c => c.name).join(","));
+          console.log(`🍪 Node-fallback cookies (${apiCookies.length}):`, apiCookies.map(c => c.name).join(","));
         }
 
-        const alt = await nodeFetchJsonWithCookies(u, {
-          referer: ref,
+        const alt = await nodeFetchJsonWithCookies(url, {
+          referer: refPageUrl,
           origin,
           cookieHeader,
           userAgent: defaultUa(),
         });
 
         if (!alt?.__error) {
-          console.log("🔁 Fallback via Node-fetch (met cookies) geslaagd:", label ?? u);
+          console.log("🔁 Fallback via Node-fetch (met cookies) geslaagd:", label ?? url);
           return alt;
         } else {
           console.warn("⚠️ Node-fallback ook mislukt:", alt.__error, alt.__head || "");
@@ -449,13 +436,10 @@ async function pageFetchJsonWithRetry(page, url, { refPageUrl, label }) {
       }
     }
 
-
     if (attempt < RETRY_MAX && transient) {
-      // Sessieverversing: referrer herladen vóór retry
+      // Sessieverversing vóór retry
       if (refPageUrl) {
-        try {
-          await page.goto(refPageUrl, { waitUntil: "networkidle0" });
-        } catch {}
+        try { await page.goto(refPageUrl, { waitUntil: "networkidle0" }); } catch {}
       }
       const waitMs = backoffMs(attempt);
       await delay(waitMs);
@@ -464,6 +448,7 @@ async function pageFetchJsonWithRetry(page, url, { refPageUrl, label }) {
     return result; // definitieve fout
   }
 }
+
 
 // ---------- MAIN ----------
 (async () => {
@@ -655,9 +640,6 @@ await logCookies(page, 'after refresh');
         await delay(SLOWDOWN_MS);
       
       }
-
-ck = await page.browserContext().cookies();
-console.log('🍪 after:', ck.map(c => c.name).join(','));
 
       await delay(SLOWDOWN_MS);
     }
