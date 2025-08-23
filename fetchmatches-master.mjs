@@ -85,32 +85,30 @@ const backoffMs = (a) => jitter(RETRY_BASE_DELAY_MS * Math.pow(2, a - 1));
    Logging & diff-config
 -----------------------------*/
 const SCRIPT_NAME = "fetchmatches-master.mjs";
-const VERSION = "v1.0-delta";         // optioneel: update mee
+const VERSION = "v1.0-delta";
 const RUNS_SHEET = "RUNS";
 const LOG_SHEET = "LOG";
 const CHANGES_SHEET = "CHANGES";
 const MASTER_SHEET = "MASTER";
 
-// Hash velden (designkeuze 3):
-// "genoemde velden" + extra set: match_id, home_name, away_name, grade_id, score_text, round
-// plus (per opdracht) date1, leader_text, venue_name, status_id
+// Hash velden (designkeuze 3)
 const HASH_FIELDS = [
   "match_id", "home_name", "away_name", "grade_id", "score_text", "round",
   "date1", "leader_text", "venue_name", "status_id",
 ];
 
-// Kandidaten per logisch veldnaam -> mogelijke keys in flatten output
+// Alias-kandidaten (fallbacks)
 const FIELD_ALIASES = {
-  match_id:   ["match_id","MatchId","matchId","id","Id","ID"],
-  home_name:  ["home_name","home","homeTeam.name","HomeTeam.name","homeTeamName","homeTeam_name"],
-  away_name:  ["away_name","away","awayTeam.name","AwayTeam.name","awayTeamName","awayTeam_name"],
-  grade_id:   ["grade_id","gradeId","GradeId","_grade","grade.id"],
-  score_text: ["score_text","score","scoreText","ScoreText","score.fullTime","result_text"],
+  match_id:   ["match_id","MatchId","matchId","id","Id","ID","match.id"],
+  home_name:  ["homeTeam.name","HomeTeam.name","home_name","home","homeTeamName"],
+  away_name:  ["awayTeam.name","AwayTeam.name","away_name","away","awayTeamName"],
+  grade_id:   ["gradeId","grade_id","grade.id","_grade"],
+  score_text: ["scoreText","score_text","score.fullTime","result_text"],
   round:      ["round","Round","round_name","roundName"],
-  date1:      ["date1","matchDate","MatchDate","datetime","Date","start_utc","startUtc"],
-  leader_text:["leader_text","LeaderText","leaders_text","leadersText"],
-  venue_name: ["venue_name","venue","venue.name","Venue.name","ground","Ground","squadName"],
-  status_id:  ["status_id","statusId","StatusId","match_status_id","matchStatus","match_status"],
+  date1:      ["date1","matchDate","MatchDate","datetime","start_utc","startUtc"],
+  leader_text:["leaderText","leader_text","leaders_text","leadersText"],
+  venue_name: ["venue.name","Venue.name","venue_name","ground","Ground","squadName"],
+  status_id:  ["status_id","statusId","match_status_id","matchStatus","match_status"]
 };
 
 /* ----------------------------
@@ -293,6 +291,48 @@ function writeCsv(filename, rows) {
 }
 
 /* ----------------------------
+   Deep getters voor hash/keys
+-----------------------------*/
+function getByPath(obj, path) {
+  try {
+    return path.split('.').reduce((acc, key) => {
+      if (acc == null) return undefined;
+      const m = key.match(/(.+)\[(\d+)\]$/);
+      if (m) {
+        const k = m[1];
+        const i = Number(m[2]);
+        const v = acc[k];
+        return Array.isArray(v) ? v[i] : undefined;
+      }
+      return acc[key];
+    }, obj);
+  } catch { return undefined; }
+}
+
+function firstNonEmpty(obj, paths) {
+  for (const p of paths) {
+    const v = getByPath(obj, p);
+    if (v !== undefined && v !== null && String(v).trim() !== "") return v;
+  }
+  return "";
+}
+
+function extractHashFieldsFromObj(raw, gradeId) {
+  return {
+    match_id:   firstNonEmpty(raw, FIELD_ALIASES.match_id),
+    home_name:  firstNonEmpty(raw, FIELD_ALIASES.home_name),
+    away_name:  firstNonEmpty(raw, FIELD_ALIASES.away_name),
+    grade_id:   gradeId || firstNonEmpty(raw, FIELD_ALIASES.grade_id),
+    score_text: firstNonEmpty(raw, FIELD_ALIASES.score_text),
+    round:      firstNonEmpty(raw, FIELD_ALIASES.round),
+    date1:      firstNonEmpty(raw, FIELD_ALIASES.date1),
+    leader_text:firstNonEmpty(raw, FIELD_ALIASES.leader_text),
+    venue_name: firstNonEmpty(raw, FIELD_ALIASES.venue_name),
+    status_id:  firstNonEmpty(raw, FIELD_ALIASES.status_id)
+  };
+}
+
+/* ----------------------------
    Warm-up per grade (zoals clubscript via iframe)
 -----------------------------*/
 async function warmupSession(page, { entityId, gradeId, seasonId }) {
@@ -346,11 +386,9 @@ const nowIso = () => new Date().toISOString();
 const newRunId = () => nowIso();
 const sha1 = (str) => crypto.createHash("sha1").update(str).digest("hex");
 
-// haal 1 veldwaarde uit rij obv aliaslijst
 function getFieldValue(row, aliases) {
   for (const k of aliases) {
     if (k in row) return String(row[k] ?? "");
-    // probeer ook JSON-keys die door flatten als JSON-string staan (niet ideaal, fallback)
   }
   return "";
 }
@@ -374,21 +412,30 @@ function getGradeIdFromRow(row) {
   return getFieldValue(row, FIELD_ALIASES.grade_id || ["grade_id","_grade"]);
 }
 
-// LOG helpers
+// Infra-tapjes altijd beschikbaar maken
 async function ensureInfraTabs(sheets) {
   await ensureSheet(sheets, RUNS_SHEET);
   await ensureSheet(sheets, LOG_SHEET);
   await ensureSheet(sheets, CHANGES_SHEET);
 }
+async function ensureInfra(sheets) {
+  try { await ensureSheet(sheets, RUNS_SHEET); } catch {}
+  try { await ensureSheet(sheets, LOG_SHEET); } catch {}
+  try { await ensureSheet(sheets, CHANGES_SHEET); } catch {}
+}
+
 async function logStart(sheets, runId, note = "") {
+  await ensureInfra(sheets);
   const start = nowIso();
   await appendRows(sheets, RUNS_SHEET, [[runId, start, "", SCRIPT_NAME, VERSION, "", "", "", note]]);
   await appendRows(sheets, LOG_SHEET, [[runId, start, SCRIPT_NAME, "main", "start", "-", "INFO", `init season=${SEASON_ID}`, note]]);
 }
 async function logError(sheets, runId, func, table, message, detail = "") {
+  await ensureInfra(sheets);
   await appendRows(sheets, LOG_SHEET, [[runId, nowIso(), SCRIPT_NAME, func, "error", table, "ERROR", message, (detail||"").slice(0,200)]]);
 }
 async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
+  await ensureInfra(sheets);
   const ts = nowIso();
   await appendRows(sheets, LOG_SHEET, [[runId, ts, SCRIPT_NAME, "main", "summary", "MASTER", "INFO",
     `grades=${gradeCount} matches=${matchCount} errors=${errors}`, "" ]]);
@@ -537,11 +584,21 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
 
       const now = nowIso();
       const rows = dataArr.map((obj) => {
+        // 1) haal betekenisvolle velden uit het ruwe object (deep)
+        const keyFields = extractHashFieldsFromObj(obj, gid);
+
+        // 2) flatten de rest
         const flat = flattenObject(obj);
+
+        // 3) forceer hash/ID velden in de rij
+        for (const [k, v] of Object.entries(keyFields)) flat[k] = v ?? "";
+
+        // 4) metadata
         flat._grade = gid;
         flat._season = seasonInGrade || SEASON_ID || "";
-        flat._run_id = runId;          // (2) timestamp/metadata per record
+        flat._run_id = runId;
         flat._fetched_at = now;
+
         return flat;
       });
 
@@ -575,9 +632,8 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
         if (id) prevById.set(id, r);
       }
 
-      // Bereken nieuwe hashes en maak upserts
       const now = nowIso();
-      const masterById = new Map();   // voor union (nieuwe + eventueel gedeactiveerde)
+      const masterById = new Map();   // nieuwe + gedeactiveerde
       const changeRows = [];          // CHANGES append-values
 
       for (const r of masterRowsRaw) {
@@ -620,7 +676,7 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
         }
       }
 
-      // Deletions: alles wat in prev stond maar niet in current → behouden met _active=0
+      // Deletions → behouden met _active=0
       for (const [id, prev] of prevById.entries()) {
         if (!masterById.has(id)) {
           const nowDel = nowIso();
@@ -663,10 +719,8 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
     if (sheets) await logError(sheets, runId, "main", "-", err.message);
   } finally {
     try {
-      if (sheets) await logSummary(sheets, runId, 0, 0, errorsCount); // fallback summary if we failed early
+      if (sheets) await logSummary(sheets, runId, 0, 0, errorsCount); // fallback summary bij early-fail
     } catch {}
-    // Browser sluiten
-    // (browser var moet in scope zijn; als launch mislukte, is browser undefined)
     if (typeof browser !== "undefined" && browser) {
       await browser.close();
       console.log("✅ Browser gesloten");
