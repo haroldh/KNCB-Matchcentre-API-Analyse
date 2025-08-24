@@ -14,6 +14,11 @@ import { setTimeout as delay } from "node:timers/promises";
 
 dotenv.config();
 
+// --- sanity logging over sheets-config ---
+console.log(`[Sheets] SPREADSHEET_ID present: ${Boolean(process.env.SPREADSHEET_ID)}`);
+console.log(`[Sheets] DISABLE_SHEETS: ${String(process.env.DISABLE_SHEETS ?? "0")}`);
+
+
 /* ========= .env =========
 SPREADSHEET_ID=...
 TELEGRAM_BOT_TOKEN=...
@@ -166,27 +171,40 @@ async function ensureSheet(sheets, title) {
 
 async function appendRows(sheets, sheetName, values) {
   if (!values?.length) return;
+  console.log(`[Sheets] append rows → ${sheetName} (#${values.length})`);
   await sheets.spreadsheets.values.append({
     spreadsheetId: SPREADSHEET_ID,
-    range: sheetName,
+    range: sheetName,                // alleen sheetnaam → append aan einde van de tabel van die sheet
     valueInputOption: "RAW",
     requestBody: { values },
   });
 }
 
 async function clearAndWriteObjects(sheets, sheetName, rows) {
-  if (!rows?.length) return;
+  if (!rows?.length) {
+    console.log(`[Sheets] clearAndWriteObjects overgeslagen: 0 rows voor ${sheetName}`);
+    return;
+  }
   const headers = uniqueFields(rows);
-  await sheets.spreadsheets.values.clear({ spreadsheetId: SPREADSHEET_ID, range: `${sheetName}!A:ZZ` });
+  console.log(`[Sheets] clearAndWrite → ${sheetName} (headers=${headers.length}, rows=${rows.length})`);
+  await sheets.spreadsheets.values.clear({
+    spreadsheetId: SPREADSHEET_ID,
+    range: `${sheetName}!A:ZZ`,
+  });
   await sheets.spreadsheets.values.append({
-    spreadsheetId: SPREADSHEET_ID, range: `${sheetName}!A1`, valueInputOption: "RAW",
+    spreadsheetId: SPREADSHEET_ID,
+    range: `${sheetName}!A1`,
+    valueInputOption: "RAW",
     requestBody: { values: [headers] },
   });
   await sheets.spreadsheets.values.append({
-    spreadsheetId: SPREADSHEET_ID, range: `${sheetName}!A2`, valueInputOption: "RAW",
+    spreadsheetId: SPREADSHEET_ID,
+    range: `${sheetName}!A2`,
+    valueInputOption: "RAW",
     requestBody: { values: rows.map(r => headers.map(h => r[h] ?? "")) },
   });
 }
+
 
 async function readSheetAsObjects(sheets, sheetName) {
   try {
@@ -414,15 +432,19 @@ function getGradeIdFromRow(row) {
 
 // Infra-tapjes altijd beschikbaar maken
 async function ensureInfraTabs(sheets) {
+  console.log("[Sheets] ensureInfraTabs → RUNS/LOG/CHANGES");
   await ensureSheet(sheets, RUNS_SHEET);
   await ensureSheet(sheets, LOG_SHEET);
   await ensureSheet(sheets, CHANGES_SHEET);
+  console.log("[Sheets] infra OK");
 }
+
 async function ensureInfra(sheets) {
-  try { await ensureSheet(sheets, RUNS_SHEET); } catch {}
-  try { await ensureSheet(sheets, LOG_SHEET); } catch {}
-  try { await ensureSheet(sheets, CHANGES_SHEET); } catch {}
+  try { await ensureSheet(sheets, RUNS_SHEET); } catch (e) { console.warn(`[Sheets] add RUNS failed: ${e.message}`); }
+  try { await ensureSheet(sheets, LOG_SHEET); } catch (e) { console.warn(`[Sheets] add LOG failed: ${e.message}`); }
+  try { await ensureSheet(sheets, CHANGES_SHEET); } catch (e) { console.warn(`[Sheets] add CHANGES failed: ${e.message}`); }
 }
+
 
 async function logStart(sheets, runId, note = "") {
   await ensureInfra(sheets);
@@ -440,6 +462,11 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
   await appendRows(sheets, LOG_SHEET, [[runId, ts, SCRIPT_NAME, "main", "summary", "MASTER", "INFO",
     `grades=${gradeCount} matches=${matchCount} errors=${errors}`, "" ]]);
   await appendRows(sheets, RUNS_SHEET, [[runId, "", ts, SCRIPT_NAME, VERSION, gradeCount, matchCount, errors, "ok"]]);
+}
+function assertSheetsReady(sheets) {
+  if (!sheets) {
+    throw new Error("Sheets client is niet geïnitialiseerd (sheets == null). Controleer SPREADSHEET_ID, credentials en scopes.");
+  }
 }
 
 /* ----------------------------
@@ -471,6 +498,8 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
         console.log("✅ Google Sheets auth OK");
         await ensureInfraTabs(sheets);
         await logStart(sheets, runId);
+        assertSheetsReady(sheets);
+
       } catch (e) {
         console.warn("⚠️ Sheets init mislukt; ga verder zonder Sheets:", e.message);
         sheets = null;
@@ -478,6 +507,14 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
     } else {
       console.log("ℹ️ Geen SPREADSHEET_ID of Sheets disabled; logging naar Sheets uit.");
     }
+if (!DISABLE_SHEETS) {
+  if (!SPREADSHEET_ID) {
+    throw new Error("SPREADSHEET_ID ontbreekt; kan niet naar Google Sheets schrijven.");
+  }
+  if (!sheets) {
+    throw new Error("Sheets client niet beschikbaar na init; kan niet naar Google Sheets schrijven.");
+  }
+}
 
     // Puppeteer
     console.log("🚀 Start puppeteer…");
@@ -583,24 +620,22 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
       totalMatches += dataArr.length;
 
       const now = nowIso();
-      const rows = dataArr.map((obj) => {
-        // 1) haal betekenisvolle velden uit het ruwe object (deep)
-        const keyFields = extractHashFieldsFromObj(obj, gid);
+const rows = dataArr.map((obj) => {
+  const keyFields = extractHashFieldsFromObj(obj, gid); // deep uit raw obj
 
-        // 2) flatten de rest
-        const flat = flattenObject(obj);
+  const flat = flattenObject(obj);  // rest flatten
 
-        // 3) forceer hash/ID velden in de rij
-        for (const [k, v] of Object.entries(keyFields)) flat[k] = v ?? "";
+  // forceer hash/ID velden in de rij — dit is cruciaal voor CHANGES & MASTER
+  for (const [k, v] of Object.entries(keyFields)) flat[k] = v ?? "";
 
-        // 4) metadata
-        flat._grade = gid;
-        flat._season = seasonInGrade || SEASON_ID || "";
-        flat._run_id = runId;
-        flat._fetched_at = now;
+  // metadata voor elke rij
+  flat._grade = gid;
+  flat._season = seasonInGrade || SEASON_ID || "";
+  flat._run_id = runId;
+  flat._fetched_at = now;
 
-        return flat;
-      });
+  return flat;
+});
 
       if (rows.length) {
         writeCsv(`${sheetName}.csv`, rows);
@@ -695,6 +730,8 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
       // Schrijf CHANGES
       if (sheets && changeRows.length) {
         await ensureSheet(sheets, CHANGES_SHEET);
+console.log(`[Diff] Prev MASTER rows: ${prevMaster.length}`);
+console.log(`[Diff] New master candidates: ${masterRowsRaw.length}`);
         await appendRows(sheets, CHANGES_SHEET, changeRows);
         console.log(`📝 CHANGES toegevoegd: ${changeRows.length} regels`);
       }
@@ -704,6 +741,8 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
       writeCsv("MASTER.csv", masterOut);
       if (sheets) {
         await ensureSheet(sheets, MASTER_SHEET);
+console.log(`[Sheets] CHANGES to append: ${changeRows.length}`);
+console.log(`[Sheets] MASTER to write: ${masterOut.length}`);
         await clearAndWriteObjects(sheets, MASTER_SHEET, masterOut);
         console.log("📈 MASTER sheet bijgewerkt");
       }
