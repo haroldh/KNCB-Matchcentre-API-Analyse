@@ -608,7 +608,7 @@ for (let i = 0; i < gradesArr.length; i++) {
   const g = gradesArr[i];
   console.log(`Processing grade ${i + 1}/${gradesArr.length}`);
   // rest van je bestaande code voor grade g ...
-}
+
       const gid = getGradeId(g);
       const seasonInGrade = getSeasonIdFromGrade(g) || SEASON_ID || "";
 
@@ -690,7 +690,7 @@ for (let i = 0; i < gradesArr.length; i++) {
       }
       await delay(SLOWDOWN_MS);
     }
-  
+  } 
 
     /* 3) MASTER + CHANGES (diff t.o.v. vorige run) */
     if (masterRowsRaw.length) {
