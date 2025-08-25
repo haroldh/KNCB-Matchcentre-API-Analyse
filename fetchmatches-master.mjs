@@ -15,9 +15,6 @@ import { setTimeout as delay } from "node:timers/promises";
 
 dotenv.config();
 
-// --- sanity logging over sheets-config ---
-if (VERBOSE >= 1) console.log(`[Sheets] SPREADSHEET_ID present: ${Boolean(process.env.SPREADSHEET_ID)}`);
-if (VERBOSE >= 1) console.log(`[Sheets] DISABLE_SHEETS: ${String(process.env.DISABLE_SHEETS ?? "0")}`);
 
 /* ========= .env =========
 SPREADSHEET_ID=...
@@ -85,6 +82,11 @@ const SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
 
 const jitter = (ms) => ms + Math.floor(Math.random() * RETRY_JITTER_MS);
 const backoffMs = (a) => jitter(RETRY_BASE_DELAY_MS * Math.pow(2, a - 1));
+
+// --- sanity logging over sheets-config ---
+if (VERBOSE >= 1) console.log(`[Sheets] SPREADSHEET_ID present: ${Boolean(process.env.SPREADSHEET_ID)}`);
+if (VERBOSE >= 1) console.log(`[Sheets] DISABLE_SHEETS: ${String(process.env.DISABLE_SHEETS ?? "0")}`);
+
 
 /* ----------------------------
    Script-identiteit & versie
@@ -533,7 +535,7 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
         await ensureInfraTabs(sheets);
         await logStart(sheets, runId, VERSION);
       } catch (e) {
-        cif (VERBOSE >= 0) onsole.warn("⚠️ Sheets init waarschuwing:", e.message);
+        if (VERBOSE >= 0) console.warn("⚠️ Sheets init waarschuwing:", e.message);
       }
     } else {
       if (VERBOSE >= 0) console.log("ℹ️ Geen SPREADSHEET_ID of Sheets disabled; logging naar Sheets uit.");
@@ -553,7 +555,7 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
     await page.setUserAgent(defaultUa());
     await page.setExtraHTTPHeaders({ "Accept-Language": "en-US,en;q=0.9,nl;q=0.8" });
 
-    page.on("console", (msg) => if (VERBOSE >= 1) console.log("PAGE →", msg.text()));
+    page.on("console", (msg) =>  {if (VERBOSE >= 1) console.log("PAGE →", msg.text())});
     page.on("requestfailed", (req) => {
       const u = req.url();
       if (/googletagmanager|google-analytics|gtag/i.test(u)) return;
@@ -761,7 +763,7 @@ for (let i = 1; i < gradesArr.length; i++) {
     // Summary logging
     if (sheets) await logSummary(sheets, runId, gradesArr.length, totalMatches, errorsCount);
 
-    if (VERBOSE >= 0) console.log("\n✅ Klaar!");
+    if (VERBOSE >= 1) console.log("\n✅ Klaar!");
   } catch (err) {
     if (VERBOSE >= 0) console.error("🛑 FATAAL:", err.message);
     await notifyTelegram(`Fatal error: ${err.message}`);
@@ -785,7 +787,7 @@ for (let i = 1; i < gradesArr.length; i++) {
     } catch {}
     if (typeof browser !== "undefined" && browser) {
       await browser.close();
-      if (VERBOSE >= 0) console.log("✅ Browser gesloten");
+      if (VERBOSE >= 1) console.log("✅ Browser gesloten");
     }
   }
 })();
