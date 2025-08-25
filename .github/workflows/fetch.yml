@@ -1,12 +1,12 @@
 name: Fetch KNCB matches & update Sheets
 
 on:
-  workflow_dispatch: {}             # handmatig starten
+  workflow_dispatch: {}
   schedule:
-    - cron: "25 05 * * *"          # elke dag 05:25 UTC (07:25 NL-tijd in zomer)
+    - cron: "25 05 * * *"  # 05:25 UTC (07:25 NL-zomertijd)
 
 permissions:
-  id-token: write                   # nodig voor OIDC
+  id-token: write   # nodig voor OIDC/WIF
   contents: read
 
 concurrency:
@@ -18,28 +18,36 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      # Niet-gevoelige vars uit GitHub "Actions > Variables"
+      # Niet-gevoelige vars (Actions > Variables)
       SEASON_ID: ${{ vars.SEASON_ID }}
       RV_ID: ${{ vars.RV_ID }}
-      MATCH_REFFERRER_URL: ${{ vars.MATCH_REFFERRER_URL }}
+
+      # LET OP: juiste keynaam (REFERRER i.p.v. REFFERRER)
+      MATCH_REFERRER_URL:  ${{ vars.MATCH_REFERRER_URL }}
       GRADES_REFERRER_URL: ${{ vars.GRADES_REFERRER_URL }}
       SEASONS_REFERRER_URL: ${{ vars.SEASONS_REFERRER_URL }}
+
       API_URL: ${{ vars.API_URL }}
-      MATCH_JSON_API_ENDPOINT: ${{ vars.MATCH_JSON_API_ENDPOINT }}
+      MATCH_JSON_API_ENDPOINT:  ${{ vars.MATCH_JSON_API_ENDPOINT }}
       GRADES_JSON_API_ENDPOINT: ${{ vars.GRADES_JSON_API_ENDPOINT }}
       SEASONS_JSON_API_ENDPOINT: ${{ vars.SEASONS_JSON_API_ENDPOINT }}
+
       CSV_OUTPUT: ${{ vars.CSV_OUTPUT }}
-      GRADE_IDS: ${{ vars.GRADE_IDS }}
-      VERBOSE: ${{ vars.VERBOSE }}
+      GRADE_IDS:  ${{ vars.GRADE_IDS }}
+      VERBOSE:    ${{ vars.VERBOSE }}
 
       # Gevoelige secrets
-      SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
-      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      SPREADSHEET_ID:      ${{ secrets.SPREADSHEET_ID }}
+      TELEGRAM_BOT_TOKEN:  ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID:    ${{ secrets.TELEGRAM_CHAT_ID }}
+      IAS_API_KEY:         ${{ secrets.IAS_API_KEY }}
 
     steps:
-      - name: Checkout
+      - name: Checkout (with tags for git version)
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # nodig voor git describe / rev-parse
+          fetch-tags: true      # zorg dat tags ook mee komen
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -52,16 +60,20 @@ jobs:
         with:
           workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
-          token_format: 'access_token' # geschikt voor googleapis
+          token_format: 'access_token'  # geschikt voor googleapis/google-auth-library
+          # audience: optional custom audience
 
       - name: Install dependencies
         run: npm ci
 
       - name: Run fetch script
+        env:
+          # Laat Node/Google libs ADC gebruiken via OIDC token
+          # (google-github-actions/auth zet dit automatisch klaar)
+          NODE_ENV: production
         run: node fetchmatches-master.mjs
 
-      # (Optioneel) Upload CSV-artefacten uit de repo root
-      - name: Upload CSV artifacts (per-grade + MASTER)
+      - name: Upload CSV artifacts (MASTER + per-grade)
         if: always()
         uses: actions/upload-artifact@v4
         with:
