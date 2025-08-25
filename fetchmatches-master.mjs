@@ -604,10 +604,15 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
 
     // 2) Per grade wedstrijden
     for (const g of gradesArr) {
+for (let i = 0; i < gradesArr.length; i++) {
+  const g = gradesArr[i];
+  console.log(`Processing grade ${i + 1}/${gradesArr.length}`);
+  // rest van je bestaande code voor grade g ...
+}
       const gid = getGradeId(g);
       const seasonInGrade = getSeasonIdFromGrade(g) || SEASON_ID || "";
 
-      console.log(`\n--- 🔁 Grade ${gid} (season ${seasonInGrade || SEASON_ID || "n/a"}) ---`);
+//      console.log(`\n${g}/${gradesArr.length}: --- 🔁 Grade ${gid} (season ${seasonInGrade || SEASON_ID || "n/a"}) ---`);
       let sheetName = `Grade_${gid}`;
       if (sheets) sheetName = await ensureSheet(sheets, sheetName);
 
@@ -684,6 +689,7 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
         await delay(SLOWDOWN_MS);
       }
       await delay(SLOWDOWN_MS);
+    }
     }
 
     /* 3) MASTER + CHANGES (diff t.o.v. vorige run) */
