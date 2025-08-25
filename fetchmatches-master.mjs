@@ -603,8 +603,7 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
     let processed = 0;
 
     // 2) Per grade wedstrijden
-    for (const g of gradesArr) {
-for (let i = 0; i < gradesArr.length; i++) {
+for (let i = 1; i < gradesArr.length; i++) {
   const g = gradesArr[i];
 //  console.log(`Processing grade ${i + 1}/${gradesArr.length}`);
   // rest van je bestaande code voor grade g ...
@@ -690,7 +689,7 @@ for (let i = 0; i < gradesArr.length; i++) {
       }
       await delay(SLOWDOWN_MS);
     }
-  } 
+   
 
     /* 3) MASTER + CHANGES (diff t.o.v. vorige run) */
     if (masterRowsRaw.length) {
