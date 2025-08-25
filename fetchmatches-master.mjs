@@ -690,7 +690,7 @@ for (let i = 0; i < gradesArr.length; i++) {
       }
       await delay(SLOWDOWN_MS);
     }
-    }
+  
 
     /* 3) MASTER + CHANGES (diff t.o.v. vorige run) */
     if (masterRowsRaw.length) {
