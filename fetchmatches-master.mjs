@@ -16,8 +16,8 @@ import { setTimeout as delay } from "node:timers/promises";
 dotenv.config();
 
 // --- sanity logging over sheets-config ---
-console.log(`[Sheets] SPREADSHEET_ID present: ${Boolean(process.env.SPREADSHEET_ID)}`);
-console.log(`[Sheets] DISABLE_SHEETS: ${String(process.env.DISABLE_SHEETS ?? "0")}`);
+if (VERBOSE >= 1) console.log(`[Sheets] SPREADSHEET_ID present: ${Boolean(process.env.SPREADSHEET_ID)}`);
+if (VERBOSE >= 1) console.log(`[Sheets] DISABLE_SHEETS: ${String(process.env.DISABLE_SHEETS ?? "0")}`);
 
 /* ========= .env =========
 SPREADSHEET_ID=...
@@ -195,30 +195,30 @@ async function ensureSheet(sheets, desiredTitle) {
   const wantedLower = desiredTitle.toLowerCase();
   const hit = existing.find(t => t.toLowerCase() === wantedLower);
   if (hit) {
-    if (hit !== desiredTitle) console.log(`[Sheets] Re-using existing tab "${hit}" (requested "${desiredTitle}")`);
-    else console.log(`[Sheets] Tab "${desiredTitle}" bestaat al`);
+    if (hit !== desiredTitle) if (VERBOSE >= 1) console.log(`[Sheets] Re-using existing tab "${hit}" (requested "${desiredTitle}")`);
+    else if (VERBOSE >= 1) console.log(`[Sheets] Tab "${desiredTitle}" bestaat al`);
     return hit;
   }
   await sheets.spreadsheets.batchUpdate({
     spreadsheetId: SPREADSHEET_ID,
     requestBody: { requests: [{ addSheet: { properties: { title: desiredTitle } } }] },
   });
-  console.log(`➕ Sheet tab "${desiredTitle}" gemaakt`);
+  if (VERBOSE >= 1) console.log(`➕ Sheet tab "${desiredTitle}" gemaakt`);
   return desiredTitle;
 }
 
 // Infra-tabs aanmaken/oppakken en feitelijke namen bewaren
 async function ensureInfraTabs(sheets) {
-  console.log("[Sheets] ensureInfraTabs → RUNS/LOG/CHANGES");
+  if (VERBOSE >= 1) console.log("[Sheets] ensureInfraTabs → RUNS/LOG/CHANGES");
   globalThis.__RUNS_NAME__    = await ensureSheet(sheets, RUNS_SHEET);
   globalThis.__LOG_NAME__     = await ensureSheet(sheets, LOG_SHEET);
   globalThis.__CHANGES_NAME__ = await ensureSheet(sheets, CHANGES_SHEET);
-  console.log(`[Sheets] infra OK → RUNS="${globalThis.__RUNS_NAME__}", LOG="${globalThis.__LOG_NAME__}", CHANGES="${globalThis.__CHANGES_NAME__}"`);
+  if (VERBOSE >= 1) console.log(`[Sheets] infra OK → RUNS="${globalThis.__RUNS_NAME__}", LOG="${globalThis.__LOG_NAME__}", CHANGES="${globalThis.__CHANGES_NAME__}"`);
 }
 async function ensureInfra(sheets) {
-  try { globalThis.__RUNS_NAME__    = await ensureSheet(sheets, RUNS_SHEET); }    catch(e){ console.warn(`[Sheets] RUNS ensure failed: ${e.message}`); }
-  try { globalThis.__LOG_NAME__     = await ensureSheet(sheets, LOG_SHEET); }     catch(e){ console.warn(`[Sheets] LOG ensure failed: ${e.message}`); }
-  try { globalThis.__CHANGES_NAME__ = await ensureSheet(sheets, CHANGES_SHEET); } catch(e){ console.warn(`[Sheets] CHANGES ensure failed: ${e.message}`); }
+  try { globalThis.__RUNS_NAME__    = await ensureSheet(sheets, RUNS_SHEET); }    catch(e){ if (VERBOSE >= 1) console.warn(`[Sheets] RUNS ensure failed: ${e.message}`); }
+  try { globalThis.__LOG_NAME__     = await ensureSheet(sheets, LOG_SHEET); }     catch(e){ if (VERBOSE >= 1) console.warn(`[Sheets] LOG ensure failed: ${e.message}`); }
+  try { globalThis.__CHANGES_NAME__ = await ensureSheet(sheets, CHANGES_SHEET); } catch(e){ if (VERBOSE >= 1) console.warn(`[Sheets] CHANGES ensure failed: ${e.message}`); }
 }
 
 function assertSheetsReady(sheets) {
@@ -229,7 +229,7 @@ function assertSheetsReady(sheets) {
 
 async function appendRows(sheets, sheetName, values) {
   if (!values?.length) return;
-  console.log(`[Sheets] append rows → ${sheetName} (#${values.length})`);
+  if (VERBOSE >= 1) console.log(`[Sheets] append rows → ${sheetName} (#${values.length})`);
   await sheets.spreadsheets.values.append({
     spreadsheetId: SPREADSHEET_ID,
     range: sheetName, // append aan einde van ‘table’ in deze sheet 
@@ -240,11 +240,11 @@ async function appendRows(sheets, sheetName, values) {
 
 async function clearAndWriteObjects(sheets, sheetName, rows) {
   if (!rows?.length) {
-    console.log(`[Sheets] clearAndWriteObjects overgeslagen: 0 rows voor ${sheetName}`);
+    if (VERBOSE >= 1) console.log(`[Sheets] clearAndWriteObjects overgeslagen: 0 rows voor ${sheetName}`);
     return;
   }
   const headers = uniqueFields(rows);
-  console.log(`[Sheets] clearAndWrite → ${sheetName} (headers=${headers.length}, rows=${rows.length})`);
+  if (VERBOSE >= 1) console.log(`[Sheets] clearAndWrite → ${sheetName} (headers=${headers.length}, rows=${rows.length})`);
   await sheets.spreadsheets.values.clear({
     spreadsheetId: SPREADSHEET_ID,
     range: `${sheetName}!A:ZZ`,
@@ -355,9 +355,9 @@ function writeCsv(filename, rows) {
     const fields = uniqueFields(rows);
     const csv = parse(rows, { fields, defaultValue: "" });
     fs.writeFileSync(filename, csv, "utf8");
-    console.log(`💾 ${filename} geschreven (${rows.length} rijen)`);
+    if (VERBOSE >= 1) console.log(`💾 ${filename} geschreven (${rows.length} rijen)`);
   } catch (e) {
-    console.warn(`⚠️ Kon ${filename} niet schrijven:`, e.message);
+    if (VERBOSE >= 0) console.warn(`⚠️ Kon ${filename} niet schrijven:`, e.message);
   }
 }
 
@@ -414,7 +414,7 @@ async function warmupSession(page, { entityId, gradeId, seasonId }) {
     await warm.close();
     if (VERBOSE >= 1) console.log(`🔥 warmup ok for grade ${gradeId}`);
   } catch (e) {
-    console.warn(`🔥 warmup failed for grade ${gradeId}: ${e.message}`);
+    if (VERBOSE >= 0) console.warn(`🔥 warmup failed for grade ${gradeId}: ${e.message}`);
   }
 }
 
@@ -512,7 +512,7 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
   try {
     // Versie bepalen en loggen
     VERSION = resolveCodeVersion("v1.1-delta-tabs");
-    console.log(`[Version] running build: ${VERSION}`);
+    if (VERBOSE >= 0) console.log(`[Version] running build: ${VERSION}`);
 
     if (!IAS_API_KEY) throw new Error("IAS_API_KEY ontbreekt in .env (X-IAS-API-REQUEST verplicht).");
 
@@ -526,17 +526,17 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
     if (!DISABLE_SHEETS && SPREADSHEET_ID) {
       try {
         const impersonationNote = process.env.GOOGLE_IMPERSONATE_SERVICE_ACCOUNT ? "(impersonation)" : "";
-        console.log("🔐 Init Google Sheets via ADC", impersonationNote);
+        if (VERBOSE >= 1) console.log("🔐 Init Google Sheets via ADC", impersonationNote);
         sheets = await getSheetsClient();
         await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID });
-        console.log("✅ Google Sheets auth OK");
+        if (VERBOSE >= 1) console.log("✅ Google Sheets auth OK");
         await ensureInfraTabs(sheets);
         await logStart(sheets, runId, VERSION);
       } catch (e) {
-        console.warn("⚠️ Sheets init waarschuwing:", e.message);
+        cif (VERBOSE >= 0) onsole.warn("⚠️ Sheets init waarschuwing:", e.message);
       }
     } else {
-      console.log("ℹ️ Geen SPREADSHEET_ID of Sheets disabled; logging naar Sheets uit.");
+      if (VERBOSE >= 0) console.log("ℹ️ Geen SPREADSHEET_ID of Sheets disabled; logging naar Sheets uit.");
     }
 
     if (!DISABLE_SHEETS) {
@@ -546,36 +546,36 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
     }
 
     // Puppeteer
-    console.log("🚀 Start puppeteer…");
+    if (VERBOSE >= 1) console.log("🚀 Start puppeteer…");
     browser = await puppeteer.launch({ headless: true, args: ["--no-sandbox", "--disable-web-security", "--disable-site-isolation-trials"] });
     const page = await browser.newPage();
     page.setDefaultNavigationTimeout(TIMEOUT_MS);
     await page.setUserAgent(defaultUa());
     await page.setExtraHTTPHeaders({ "Accept-Language": "en-US,en;q=0.9,nl;q=0.8" });
 
-    page.on("console", (msg) => console.log("PAGE →", msg.text()));
+    page.on("console", (msg) => if (VERBOSE >= 1) console.log("PAGE →", msg.text()));
     page.on("requestfailed", (req) => {
       const u = req.url();
       if (/googletagmanager|google-analytics|gtag/i.test(u)) return;
-      console.log("REQ FAIL →", req.failure()?.errorText, u);
+      if (VERBOSE >= 0) console.log("REQ FAIL →", req.failure()?.errorText, u);
     });
 
     // Referrer + warm-up (root)
-    console.log("📥 Open referrer pagina…", refPage);
+    if (VERBOSE >= 1) console.log("📥 Open referrer pagina…", refPage);
     await page.goto(refPage, { waitUntil: "networkidle0" });
     if (process.env.API_URL) {
-      console.log("📥 Warm-up API call…", process.env.API_URL);
+      if (VERBOSE >= 1) console.log("📥 Warm-up API call…", process.env.API_URL);
       await fetchJsonInPage(page, process.env.API_URL, refPage, "warmup");
     }
     await delay(SLOWDOWN_MS);
 
     // 1) GRADES ophalen
-    console.log("📥 Haal grades op…");
+    if (VERBOSE >= 1) console.log("📥 Haal grades op…");
     const gradesJson = await fetchJsonInPage(page, GRADES_URL.toString(), refPage, "grades");
     if (gradesJson?.__error) throw new Error(`Grades endpoint error: ${gradesJson.__error}`);
 
     const gradesArrRaw = extractArray(gradesJson) || [];
-    console.log(`▶ Gevonden ${gradesArrRaw.length} raw grades`);
+    if (VERBOSE >= 0) console.log(`▶ Gevonden ${gradesArrRaw.length} raw grades`);
 
     // GRADES → CSV + Sheet
     const gradesRows = gradesArrRaw.map(flattenObject);
@@ -584,7 +584,7 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
       if (sheets) {
         const gradesTab = await ensureSheet(sheets, "GRADES");
         await clearAndWriteObjects(sheets, gradesTab, gradesRows);
-        console.log(`📈 Sheet "${gradesTab}" geüpdatet (${gradesRows.length} rijen)`);
+        if (VERBOSE >= 1) console.log(`📈 Sheet "${gradesTab}" geüpdatet (${gradesRows.length} rijen)`);
       }
     }
 
@@ -597,7 +597,7 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
       if (!gid) { if (VERBOSE >= 1) console.log("⚠️ Grade zonder id, skip:", g); return false; }
       return !onlyIds.length || onlyIds.includes(gid);
     });
-    console.log(`🧮 Te verwerken grades: ${gradesArr.length}${onlyIds.length ? ` (gefilterd uit ${gradesArrRaw.length})` : ""}`);
+    if (VERBOSE >= 1) console.log(`🧮 Te verwerken grades: ${gradesArr.length}${onlyIds.length ? ` (gefilterd uit ${gradesArrRaw.length})` : ""}`);
 
     const masterRowsRaw = [];
     let processed = 0;
@@ -611,7 +611,7 @@ for (let i = 1; i < gradesArr.length; i++) {
       const gid = getGradeId(g);
       const seasonInGrade = getSeasonIdFromGrade(g) || SEASON_ID || "";
 
-      console.log(`\n${i}/${gradesArr.length}: --- 🔁 Grade ${gid} (season ${seasonInGrade || SEASON_ID || "n/a"}) ---`);
+      if (VERBOSE >= 0) console.log(`\n${i}/${gradesArr.length}: --- 🔁 Grade ${gid} (season ${seasonInGrade || SEASON_ID || "n/a"}) ---`);
       let sheetName = `Grade_${gid}`;
       if (sheets) sheetName = await ensureSheet(sheets, sheetName);
 
@@ -621,11 +621,11 @@ for (let i = 1; i < gradesArr.length; i++) {
 
       // Matches URL + fetch
       const matchUrl = buildMatchUrl(MATCH_URL, { gradeId: gid, seasonId: seasonInGrade || SEASON_ID });
-      console.log("🌐 Fetch matches:", matchUrl);
+      if (VERBOSE >= 1) console.log("🌐 Fetch matches:", matchUrl);
 
       let matchesJson = await fetchJsonInPage(page, matchUrl, refPage, `grade ${gid}`);
       if (matchesJson?.__error && String(matchesJson.__error).includes("HTTP 401")) {
-        console.log("🔄 401: nogmaals warm-up en retry…");
+        if (VERBOSE >= 1) console.log("🔄 401: nogmaals warm-up en retry…");
         await warmupSession(page, { entityId, gradeId: gid, seasonId: seasonInGrade || SEASON_ID });
         await delay(250);
         matchesJson = await fetchJsonInPage(page, matchUrl, refPage, `grade ${gid} (retry)`);
@@ -633,7 +633,7 @@ for (let i = 1; i < gradesArr.length; i++) {
 
       if (matchesJson?.__error) {
         const msg = `Grade ${gid}: ${matchesJson.__error}${matchesJson.__head ? ` | head=${matchesJson.__head}` : ""}`;
-        console.error("⚠️", msg);
+        if (VERBOSE >= 0) console.error("⚠️", msg);
         errorsCount++;
         if (sheets) await logError(sheets, runId, "fetchMatches", sheetName, msg, matchesJson.__head);
         await notifyTelegram(`⚠️ ${msg}`);
@@ -643,13 +643,13 @@ for (let i = 1; i < gradesArr.length; i++) {
       const dataArr = extractArray(matchesJson);
       if (!Array.isArray(dataArr)) {
         const msg = `Grade ${gid}: geen array in response`;
-        console.warn("⚠️", msg);
+        if (VERBOSE >= 0) console.warn("⚠️", msg);
         errorsCount++;
         if (sheets) await logError(sheets, runId, "fetchMatches", sheetName, msg);
         continue;
       }
 
-      console.log(`✅ ${sheetName}: ${dataArr.length} matches`);
+      if (VERBOSE >= 0) console.log(`✅ ${sheetName}: ${dataArr.length} matches`);
       totalMatches += dataArr.length;
 
       const now = nowIso();
@@ -676,14 +676,14 @@ for (let i = 1; i < gradesArr.length; i++) {
         writeCsv(`${sheetName}.csv`, rows);
         if (sheets) {
           await clearAndWriteObjects(sheets, sheetName, rows);
-          console.log(`📈 Sheet "${sheetName}" geüpdatet`);
+          if (VERBOSE >= 1) console.log(`📈 Sheet "${sheetName}" geüpdatet`);
         }
         masterRowsRaw.push(...rows);
       }
 
       processed++;
       if (REFRESH_REFERRER_EVERY > 0 && processed % REFRESH_REFERRER_EVERY === 0) {
-        console.log("🔄 Sessieverversing: referrer herladen…", refPage);
+        if (VERBOSE >= 1) console.log("🔄 Sessieverversing: referrer herladen…", refPage);
         try { await page.goto(refPage, { waitUntil: "networkidle0" }); } catch {}
         await delay(SLOWDOWN_MS);
       }
@@ -693,7 +693,7 @@ for (let i = 1; i < gradesArr.length; i++) {
 
     /* 3) MASTER + CHANGES (diff t.o.v. vorige run) */
     if (masterRowsRaw.length) {
-      console.log(`\n📊 Diff & MASTER opbouwen (input: ${masterRowsRaw.length} rijen)…`);
+      if (VERBOSE >= 0) console.log(`\n📊 Diff & MASTER opbouwen (input: ${masterRowsRaw.length} rijen)…`);
 
       // Vorige MASTER
       const masterTab = sheets ? await ensureSheet(sheets, MASTER_SHEET) : MASTER_SHEET;
@@ -704,8 +704,8 @@ for (let i = 1; i < gradesArr.length; i++) {
         if (id) prevById.set(id, r);
       }
 
-      console.log(`[Diff] Prev MASTER rows: ${prevMaster.length}`);
-      console.log(`[Diff] New master candidates: ${masterRowsRaw.length}`);
+      if (VERBOSE >= 0) console.log(`[Diff] Prev MASTER rows: ${prevMaster.length}`);
+      if (VERBOSE >= 0) console.log(`[Diff] New master candidates: ${masterRowsRaw.length}`);
 
       const now = nowIso();
       const masterById = new Map();
@@ -742,28 +742,28 @@ for (let i = 1; i < gradesArr.length; i++) {
       // CHANGES
       if (sheets && changeRows.length) {
         const changesTab = await ensureSheet(sheets, CHANGES_SHEET);
-        console.log(`[Sheets] CHANGES to append: ${changeRows.length}`);
+        if (VERBOSE >= 0) console.log(`[Sheets] CHANGES to append: ${changeRows.length}`);
         await appendRows(sheets, changesTab, changeRows);
-        console.log(`📝 CHANGES toegevoegd: ${changeRows.length} regels`);
+        if (VERBOSE >= 0) console.log(`📝 CHANGES toegevoegd: ${changeRows.length} regels`);
       }
 
       // MASTER
       const masterOut = Array.from(masterById.values());
-      console.log(`[Sheets] MASTER to write: ${masterOut.length}`);
+      if (VERBOSE >= 0) console.log(`[Sheets] MASTER to write: ${masterOut.length}`);
       writeCsv("MASTER.csv", masterOut);
       if (sheets) {
         const masterResolved = await ensureSheet(sheets, MASTER_SHEET);
         await clearAndWriteObjects(sheets, masterResolved, masterOut);
-        console.log("📈 MASTER sheet bijgewerkt");
+        if (VERBOSE >= 0) console.log("📈 MASTER sheet bijgewerkt");
       }
     }
 
     // Summary logging
     if (sheets) await logSummary(sheets, runId, gradesArr.length, totalMatches, errorsCount);
 
-    console.log("\n✅ Klaar!");
+    if (VERBOSE >= 0) console.log("\n✅ Klaar!");
   } catch (err) {
-    console.error("🛑 FATAAL:", err.message);
+    if (VERBOSE >= 0) console.error("🛑 FATAAL:", err.message);
     await notifyTelegram(`Fatal error: ${err.message}`);
     try {
       if (SPREADSHEET_ID) {
@@ -785,7 +785,7 @@ for (let i = 1; i < gradesArr.length; i++) {
     } catch {}
     if (typeof browser !== "undefined" && browser) {
       await browser.close();
-      console.log("✅ Browser gesloten");
+      if (VERBOSE >= 0) console.log("✅ Browser gesloten");
     }
   }
 })();
