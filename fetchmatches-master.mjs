@@ -18,7 +18,6 @@ dotenv.config();
 console.log(`[Sheets] SPREADSHEET_ID present: ${Boolean(process.env.SPREADSHEET_ID)}`);
 console.log(`[Sheets] DISABLE_SHEETS: ${String(process.env.DISABLE_SHEETS ?? "0")}`);
 
-
 /* ========= .env =========
 SPREADSHEET_ID=...
 TELEGRAM_BOT_TOKEN=...
@@ -90,7 +89,7 @@ const backoffMs = (a) => jitter(RETRY_BASE_DELAY_MS * Math.pow(2, a - 1));
    Logging & diff-config
 -----------------------------*/
 const SCRIPT_NAME = "fetchmatches-master.mjs";
-const VERSION = "v1.0-delta";
+const VERSION = "v1.1-delta-tabs";
 const RUNS_SHEET = "RUNS";
 const LOG_SHEET = "LOG";
 const CHANGES_SHEET = "CHANGES";
@@ -153,19 +152,47 @@ async function getSheetsClient() {
   return google.sheets({ version: "v4", auth: directAuth });
 }
 
-async function getSheetTitles(sheets) {
+// Case-insensitieve ensureSheet: retourneert de feitelijke titel
+async function ensureSheet(sheets, desiredTitle) {
   const resp = await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID });
-  return (resp.data.sheets || []).map((s) => s.properties.title);
+  const existing = (resp.data.sheets || []).map(s => s.properties.title);
+  const wantedLower = desiredTitle.toLowerCase();
+  const hit = existing.find(t => t.toLowerCase() === wantedLower);
+  if (hit) {
+    if (hit !== desiredTitle) {
+      console.log(`[Sheets] Re-using existing tab "${hit}" (requested "${desiredTitle}")`);
+    } else {
+      console.log(`[Sheets] Tab "${desiredTitle}" bestaat al`);
+    }
+    return hit;
+  }
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: SPREADSHEET_ID,
+    requestBody: { requests: [{ addSheet: { properties: { title: desiredTitle } } }] },
+  });
+  console.log(`➕ Sheet tab "${desiredTitle}" gemaakt`);
+  return desiredTitle;
 }
 
-async function ensureSheet(sheets, title) {
-  const titles = await getSheetTitles(sheets);
-  if (!titles.includes(title)) {
-    await sheets.spreadsheets.batchUpdate({
-      spreadsheetId: SPREADSHEET_ID,
-      requestBody: { requests: [{ addSheet: { properties: { title } } }] },
-    });
-    console.log(`➕ Sheet tab "${title}" gemaakt`);
+// Infra-tabs aanmaken/oppakken en feitelijke namen bewaren
+async function ensureInfraTabs(sheets) {
+  console.log("[Sheets] ensureInfraTabs → RUNS/LOG/CHANGES");
+  globalThis.__RUNS_NAME__    = await ensureSheet(sheets, RUNS_SHEET);
+  globalThis.__LOG_NAME__     = await ensureSheet(sheets, LOG_SHEET);
+  globalThis.__CHANGES_NAME__ = await ensureSheet(sheets, CHANGES_SHEET);
+  console.log(`[Sheets] infra OK → RUNS="${globalThis.__RUNS_NAME__}", LOG="${globalThis.__LOG_NAME__}", CHANGES="${globalThis.__CHANGES_NAME__}"`);
+}
+
+// “Soft” variant (veilig bij tussentijdse writes)
+async function ensureInfra(sheets) {
+  try { globalThis.__RUNS_NAME__    = await ensureSheet(sheets, RUNS_SHEET); }    catch(e){ console.warn(`[Sheets] RUNS ensure failed: ${e.message}`); }
+  try { globalThis.__LOG_NAME__     = await ensureSheet(sheets, LOG_SHEET); }     catch(e){ console.warn(`[Sheets] LOG ensure failed: ${e.message}`); }
+  try { globalThis.__CHANGES_NAME__ = await ensureSheet(sheets, CHANGES_SHEET); } catch(e){ console.warn(`[Sheets] CHANGES ensure failed: ${e.message}`); }
+}
+
+function assertSheetsReady(sheets) {
+  if (!sheets) {
+    throw new Error("Sheets client is niet geïnitialiseerd (sheets == null). Controleer SPREADSHEET_ID, credentials en scopes.");
   }
 }
 
@@ -174,7 +201,7 @@ async function appendRows(sheets, sheetName, values) {
   console.log(`[Sheets] append rows → ${sheetName} (#${values.length})`);
   await sheets.spreadsheets.values.append({
     spreadsheetId: SPREADSHEET_ID,
-    range: sheetName,                // alleen sheetnaam → append aan einde van de tabel van die sheet
+    range: sheetName,
     valueInputOption: "RAW",
     requestBody: { values },
   });
@@ -192,19 +219,14 @@ async function clearAndWriteObjects(sheets, sheetName, rows) {
     range: `${sheetName}!A:ZZ`,
   });
   await sheets.spreadsheets.values.append({
-    spreadsheetId: SPREADSHEET_ID,
-    range: `${sheetName}!A1`,
-    valueInputOption: "RAW",
+    spreadsheetId: SPREADSHEET_ID, range: `${sheetName}!A1`, valueInputOption: "RAW",
     requestBody: { values: [headers] },
   });
   await sheets.spreadsheets.values.append({
-    spreadsheetId: SPREADSHEET_ID,
-    range: `${sheetName}!A2`,
-    valueInputOption: "RAW",
+    spreadsheetId: SPREADSHEET_ID, range: `${sheetName}!A2`, valueInputOption: "RAW",
     requestBody: { values: rows.map(r => headers.map(h => r[h] ?? "")) },
   });
 }
-
 
 async function readSheetAsObjects(sheets, sheetName) {
   try {
@@ -326,7 +348,6 @@ function getByPath(obj, path) {
     }, obj);
   } catch { return undefined; }
 }
-
 function firstNonEmpty(obj, paths) {
   for (const p of paths) {
     const v = getByPath(obj, p);
@@ -334,7 +355,6 @@ function firstNonEmpty(obj, paths) {
   }
   return "";
 }
-
 function extractHashFieldsFromObj(raw, gradeId) {
   return {
     match_id:   firstNonEmpty(raw, FIELD_ALIASES.match_id),
@@ -430,43 +450,23 @@ function getGradeIdFromRow(row) {
   return getFieldValue(row, FIELD_ALIASES.grade_id || ["grade_id","_grade"]);
 }
 
-// Infra-tapjes altijd beschikbaar maken
-async function ensureInfraTabs(sheets) {
-  console.log("[Sheets] ensureInfraTabs → RUNS/LOG/CHANGES");
-  await ensureSheet(sheets, RUNS_SHEET);
-  await ensureSheet(sheets, LOG_SHEET);
-  await ensureSheet(sheets, CHANGES_SHEET);
-  console.log("[Sheets] infra OK");
-}
-
-async function ensureInfra(sheets) {
-  try { await ensureSheet(sheets, RUNS_SHEET); } catch (e) { console.warn(`[Sheets] add RUNS failed: ${e.message}`); }
-  try { await ensureSheet(sheets, LOG_SHEET); } catch (e) { console.warn(`[Sheets] add LOG failed: ${e.message}`); }
-  try { await ensureSheet(sheets, CHANGES_SHEET); } catch (e) { console.warn(`[Sheets] add CHANGES failed: ${e.message}`); }
-}
-
-
+// Infra-tapjes logging
 async function logStart(sheets, runId, note = "") {
   await ensureInfra(sheets);
   const start = nowIso();
-  await appendRows(sheets, RUNS_SHEET, [[runId, start, "", SCRIPT_NAME, VERSION, "", "", "", note]]);
-  await appendRows(sheets, LOG_SHEET, [[runId, start, SCRIPT_NAME, "main", "start", "-", "INFO", `init season=${SEASON_ID}`, note]]);
+  await appendRows(sheets, globalThis.__RUNS_NAME__, [[runId, start, "", SCRIPT_NAME, VERSION, "", "", "", note]]);
+  await appendRows(sheets, globalThis.__LOG_NAME__,  [[runId, start, SCRIPT_NAME, "main", "start", "-", "INFO", `init season=${SEASON_ID}`, note]]);
 }
 async function logError(sheets, runId, func, table, message, detail = "") {
   await ensureInfra(sheets);
-  await appendRows(sheets, LOG_SHEET, [[runId, nowIso(), SCRIPT_NAME, func, "error", table, "ERROR", message, (detail||"").slice(0,200)]]);
+  await appendRows(sheets, globalThis.__LOG_NAME__, [[runId, nowIso(), SCRIPT_NAME, func, "error", table, "ERROR", message, (detail||"").slice(0,200)]]);
 }
 async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
   await ensureInfra(sheets);
   const ts = nowIso();
-  await appendRows(sheets, LOG_SHEET, [[runId, ts, SCRIPT_NAME, "main", "summary", "MASTER", "INFO",
+  await appendRows(sheets, globalThis.__LOG_NAME__,  [[runId, ts, SCRIPT_NAME, "main", "summary", "MASTER", "INFO",
     `grades=${gradeCount} matches=${matchCount} errors=${errors}`, "" ]]);
-  await appendRows(sheets, RUNS_SHEET, [[runId, "", ts, SCRIPT_NAME, VERSION, gradeCount, matchCount, errors, "ok"]]);
-}
-function assertSheetsReady(sheets) {
-  if (!sheets) {
-    throw new Error("Sheets client is niet geïnitialiseerd (sheets == null). Controleer SPREADSHEET_ID, credentials en scopes.");
-  }
+  await appendRows(sheets, globalThis.__RUNS_NAME__, [[runId, "", ts, SCRIPT_NAME, VERSION, gradeCount, matchCount, errors, "ok"]]);
 }
 
 /* ----------------------------
@@ -498,23 +498,23 @@ function assertSheetsReady(sheets) {
         console.log("✅ Google Sheets auth OK");
         await ensureInfraTabs(sheets);
         await logStart(sheets, runId);
-        assertSheetsReady(sheets);
-
       } catch (e) {
-        console.warn("⚠️ Sheets init mislukt; ga verder zonder Sheets:", e.message);
-        sheets = null;
+        console.warn("⚠️ Sheets init waarschuwing:", e.message);
       }
     } else {
       console.log("ℹ️ Geen SPREADSHEET_ID of Sheets disabled; logging naar Sheets uit.");
     }
-if (!DISABLE_SHEETS) {
-  if (!SPREADSHEET_ID) {
-    throw new Error("SPREADSHEET_ID ontbreekt; kan niet naar Google Sheets schrijven.");
-  }
-  if (!sheets) {
-    throw new Error("Sheets client niet beschikbaar na init; kan niet naar Google Sheets schrijven.");
-  }
-}
+
+    if (!DISABLE_SHEETS) {
+      if (!SPREADSHEET_ID) {
+        throw new Error("SPREADSHEET_ID ontbreekt; kan niet naar Google Sheets schrijven.");
+      }
+      if (!sheets) {
+        throw new Error("Sheets client niet beschikbaar na init; kan niet naar Google Sheets schrijven.");
+      }
+      // extra zekerheid: infra nogmaals “soft” garanderen
+      await ensureInfra(sheets);
+    }
 
     // Puppeteer
     console.log("🚀 Start puppeteer…");
@@ -553,9 +553,9 @@ if (!DISABLE_SHEETS) {
     if (gradesRows.length) {
       writeCsv("GRADES.csv", gradesRows);
       if (sheets) {
-        await ensureSheet(sheets, "GRADES");
-        await clearAndWriteObjects(sheets, "GRADES", gradesRows);
-        console.log(`📈 Sheet "GRADES" geüpdatet (${gradesRows.length} rijen)`);
+        const gradesTab = await ensureSheet(sheets, "GRADES");
+        await clearAndWriteObjects(sheets, gradesTab, gradesRows);
+        console.log(`📈 Sheet "${gradesTab}" geüpdatet (${gradesRows.length} rijen)`);
       }
     }
 
@@ -579,8 +579,8 @@ if (!DISABLE_SHEETS) {
       const seasonInGrade = getSeasonIdFromGrade(g) || SEASON_ID || "";
 
       console.log(`\n--- 🔁 Grade ${gid} (season ${seasonInGrade || SEASON_ID || "n/a"}) ---`);
-      const sheetName = `Grade_${gid}`;
-      if (sheets) await ensureSheet(sheets, sheetName);
+      let sheetName = `Grade_${gid}`;
+      if (sheets) sheetName = await ensureSheet(sheets, sheetName);
 
       // Warm-up per grade
       const entityId = String(process.env.RV_ID || "134453");
@@ -620,22 +620,24 @@ if (!DISABLE_SHEETS) {
       totalMatches += dataArr.length;
 
       const now = nowIso();
-const rows = dataArr.map((obj) => {
-  const keyFields = extractHashFieldsFromObj(obj, gid); // deep uit raw obj
+      const rows = dataArr.map((obj) => {
+        // 1) haal betekenisvolle velden uit het ruwe object (deep)
+        const keyFields = extractHashFieldsFromObj(obj, gid);
 
-  const flat = flattenObject(obj);  // rest flatten
+        // 2) flatten de rest
+        const flat = flattenObject(obj);
 
-  // forceer hash/ID velden in de rij — dit is cruciaal voor CHANGES & MASTER
-  for (const [k, v] of Object.entries(keyFields)) flat[k] = v ?? "";
+        // 3) forceer hash/ID velden in de rij
+        for (const [k, v] of Object.entries(keyFields)) flat[k] = v ?? "";
 
-  // metadata voor elke rij
-  flat._grade = gid;
-  flat._season = seasonInGrade || SEASON_ID || "";
-  flat._run_id = runId;
-  flat._fetched_at = now;
+        // 4) metadata
+        flat._grade = gid;
+        flat._season = seasonInGrade || SEASON_ID || "";
+        flat._run_id = runId;
+        flat._fetched_at = now;
 
-  return flat;
-});
+        return flat;
+      });
 
       if (rows.length) {
         writeCsv(`${sheetName}.csv`, rows);
@@ -660,12 +662,16 @@ const rows = dataArr.map((obj) => {
       console.log(`\n📊 Diff & MASTER opbouwen (input: ${masterRowsRaw.length} rijen)…`);
 
       // Lees vorige MASTER als objecten
-      const prevMaster = sheets ? await readSheetAsObjects(sheets, MASTER_SHEET) : [];
+      const masterTab = sheets ? await ensureSheet(sheets, MASTER_SHEET) : MASTER_SHEET;
+      const prevMaster = sheets ? await readSheetAsObjects(sheets, masterTab) : [];
       const prevById = new Map();
       for (const r of prevMaster) {
         const id = getMatchIdFromRow(r);
         if (id) prevById.set(id, r);
       }
+
+      console.log(`[Diff] Prev MASTER rows: ${prevMaster.length}`);
+      console.log(`[Diff] New master candidates: ${masterRowsRaw.length}`);
 
       const now = nowIso();
       const masterById = new Map();   // nieuwe + gedeactiveerde
@@ -729,21 +735,19 @@ const rows = dataArr.map((obj) => {
 
       // Schrijf CHANGES
       if (sheets && changeRows.length) {
-        await ensureSheet(sheets, CHANGES_SHEET);
-console.log(`[Diff] Prev MASTER rows: ${prevMaster.length}`);
-console.log(`[Diff] New master candidates: ${masterRowsRaw.length}`);
-        await appendRows(sheets, CHANGES_SHEET, changeRows);
+        const changesTab = await ensureSheet(sheets, CHANGES_SHEET);
+        console.log(`[Sheets] CHANGES to append: ${changeRows.length}`);
+        await appendRows(sheets, changesTab, changeRows);
         console.log(`📝 CHANGES toegevoegd: ${changeRows.length} regels`);
       }
 
       // Schrijf MASTER (rebuild) + CSV
       const masterOut = Array.from(masterById.values());
+      console.log(`[Sheets] MASTER to write: ${masterOut.length}`);
       writeCsv("MASTER.csv", masterOut);
       if (sheets) {
-        await ensureSheet(sheets, MASTER_SHEET);
-console.log(`[Sheets] CHANGES to append: ${changeRows.length}`);
-console.log(`[Sheets] MASTER to write: ${masterOut.length}`);
-        await clearAndWriteObjects(sheets, MASTER_SHEET, masterOut);
+        const masterResolved = await ensureSheet(sheets, MASTER_SHEET);
+        await clearAndWriteObjects(sheets, masterResolved, masterOut);
         console.log("📈 MASTER sheet bijgewerkt");
       }
     }
@@ -755,10 +759,23 @@ console.log(`[Sheets] MASTER to write: ${masterOut.length}`);
   } catch (err) {
     console.error("🛑 FATAAL:", err.message);
     await notifyTelegram(`Fatal error: ${err.message}`);
-    if (sheets) await logError(sheets, runId, "main", "-", err.message);
+    try {
+      // probeer alsnog een errorlog te schrijven
+      // (indien sheets init wel lukte)
+      // NB: soft ensureInfra voorkomt 'tab bestaat niet' issues
+      // en gebruikt case-insensitieve namen.
+      // Als sheets null is, slaat dit netjes over.
+      if (SPREADSHEET_ID) {
+        const sheetsTmp = await getSheetsClient().catch(()=>null);
+        if (sheetsTmp) {
+          await ensureInfra(sheetsTmp);
+          await appendRows(sheetsTmp, globalThis.__LOG_NAME__ || LOG_SHEET, [[newRunId(), nowIso(), SCRIPT_NAME, "main", "fatal", "-", "ERROR", err.message, ""]]);
+        }
+      }
+    } catch {}
   } finally {
     try {
-      if (sheets) await logSummary(sheets, runId, 0, 0, errorsCount); // fallback summary bij early-fail
+      if (sheets) await logSummary(sheets, newRunId(), 0, 0, 0); // harmless fallback log
     } catch {}
     if (typeof browser !== "undefined" && browser) {
       await browser.close();
