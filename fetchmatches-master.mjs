@@ -10,6 +10,7 @@ import { GoogleAuth, Impersonated } from "google-auth-library";
 import dotenv from "dotenv";
 import axios from "axios";
 import crypto from "node:crypto";
+import { execSync } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
 
 dotenv.config();
@@ -26,22 +27,22 @@ TELEGRAM_CHAT_ID=...
 SEASON_ID=19
 RV_ID=134453
 
-// Referrers (gebruikt om sessie/cookies te (re)seeden)
+// Referrers (sessie/cookies seeden)
 MATCH_REFERRER_URL=https://matchcentre.kncb.nl/matches/
 GRADES_REFERRER_URL=https://matchcentre.kncb.nl/matches/
 SEASONS_REFERRER_URL=https://matchcentre.kncb.nl/seasons/
 
-// JSON endpoints (Resultsvault) — LET OP: behoud de trailing slash in /matches/
+// JSON endpoints (Resultsvault)
 MATCH_JSON_API_ENDPOINT=https://api.resultsvault.co.uk/rv/134453/matches/?apiid=1002&action=ors&maxrecs=1000&strmflg=1
 GRADES_JSON_API_ENDPOINT=https://api.resultsvault.co.uk/rv/134453/grades/?apiid=1002&seasonid=19
 MATCHSTATUS_JSON_API_ENDPOINT=
 SEASONS_JSON_API_ENDPOINT=https://api.resultsvault.co.uk/rv/134453/seasons/?apiid=1002
 
 // Clubscript-vereiste
-IAS_API_KEY=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx   # ← zet hier je echte waarde in
+IAS_API_KEY=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 
 // Optioneel gedrag
-SLOWDOWN_MS=200      // ± clubscript
+SLOWDOWN_MS=200
 PUPPETEER_TIMEOUT_MS=30000
 RETRY_MAX=2
 RETRY_BASE_DELAY_MS=600
@@ -86,16 +87,51 @@ const jitter = (ms) => ms + Math.floor(Math.random() * RETRY_JITTER_MS);
 const backoffMs = (a) => jitter(RETRY_BASE_DELAY_MS * Math.pow(2, a - 1));
 
 /* ----------------------------
-   Logging & diff-config
+   Script-identiteit & versie
 -----------------------------*/
 const SCRIPT_NAME = "fetchmatches-master.mjs";
-const VERSION = "v1.1-delta-tabs";
+// VERSION wordt dynamisch bepaald via Git/CI:
+let VERSION = "v1"; // fallback; overschreven door resolveCodeVersion()
+
+function pickCiSha() {
+  const cands = [
+    process.env.GIT_COMMIT,
+    process.env.GITHUB_SHA,          // GitHub Actions
+    process.env.CI_COMMIT_SHA,       // GitLab CI
+    process.env.BITBUCKET_COMMIT,    // Bitbucket Pipelines
+    process.env.VERCEL_GIT_COMMIT_SHA,
+    process.env.NETLIFY_COMMIT_REF,
+  ].filter(Boolean);
+  return cands.length ? cands[0] : null;
+}
+function tryExec(cmd) {
+  try {
+    const out = execSync(cmd, { stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
+    return out || null;
+  } catch { return null; }
+}
+// Git-versie bepalen (CI > describe > rev-parse)
+function resolveCodeVersion(fallback = "v1") {
+  const ci = pickCiSha();
+  if (ci) return ci;
+  const described =
+    tryExec("git describe --tags --always --dirty") || // tag + commits + sha + '-dirty' indien nodig 
+    tryExec("git describe --always --dirty");
+  if (described) return described;
+  const shortSha = tryExec("git rev-parse --short HEAD"); // huidige commit hash 
+  if (shortSha) return shortSha;
+  return fallback;
+}
+
+/* ----------------------------
+   Diff-config
+-----------------------------*/
 const RUNS_SHEET = "RUNS";
 const LOG_SHEET = "LOG";
 const CHANGES_SHEET = "CHANGES";
 const MASTER_SHEET = "MASTER";
 
-// Hash velden (designkeuze 3)
+// Hash velden
 const HASH_FIELDS = [
   "match_id", "home_name", "away_name", "grade_id", "score_text", "round",
   "date1", "leader_text", "venue_name", "status_id",
@@ -132,7 +168,7 @@ async function notifyTelegram(text) {
 }
 
 /* ----------------------------
-   Google Sheets
+   Google Sheets helpers
 -----------------------------*/
 async function getSheetsClient() {
   const impersonate = process.env.GOOGLE_IMPERSONATE_SERVICE_ACCOUNT;
@@ -152,18 +188,15 @@ async function getSheetsClient() {
   return google.sheets({ version: "v4", auth: directAuth });
 }
 
-// Case-insensitieve ensureSheet: retourneert de feitelijke titel
+// Case-insensitieve ensureSheet: retourneert feitelijke titel
 async function ensureSheet(sheets, desiredTitle) {
   const resp = await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID });
   const existing = (resp.data.sheets || []).map(s => s.properties.title);
   const wantedLower = desiredTitle.toLowerCase();
   const hit = existing.find(t => t.toLowerCase() === wantedLower);
   if (hit) {
-    if (hit !== desiredTitle) {
-      console.log(`[Sheets] Re-using existing tab "${hit}" (requested "${desiredTitle}")`);
-    } else {
-      console.log(`[Sheets] Tab "${desiredTitle}" bestaat al`);
-    }
+    if (hit !== desiredTitle) console.log(`[Sheets] Re-using existing tab "${hit}" (requested "${desiredTitle}")`);
+    else console.log(`[Sheets] Tab "${desiredTitle}" bestaat al`);
     return hit;
   }
   await sheets.spreadsheets.batchUpdate({
@@ -182,8 +215,6 @@ async function ensureInfraTabs(sheets) {
   globalThis.__CHANGES_NAME__ = await ensureSheet(sheets, CHANGES_SHEET);
   console.log(`[Sheets] infra OK → RUNS="${globalThis.__RUNS_NAME__}", LOG="${globalThis.__LOG_NAME__}", CHANGES="${globalThis.__CHANGES_NAME__}"`);
 }
-
-// “Soft” variant (veilig bij tussentijdse writes)
 async function ensureInfra(sheets) {
   try { globalThis.__RUNS_NAME__    = await ensureSheet(sheets, RUNS_SHEET); }    catch(e){ console.warn(`[Sheets] RUNS ensure failed: ${e.message}`); }
   try { globalThis.__LOG_NAME__     = await ensureSheet(sheets, LOG_SHEET); }     catch(e){ console.warn(`[Sheets] LOG ensure failed: ${e.message}`); }
@@ -201,7 +232,7 @@ async function appendRows(sheets, sheetName, values) {
   console.log(`[Sheets] append rows → ${sheetName} (#${values.length})`);
   await sheets.spreadsheets.values.append({
     spreadsheetId: SPREADSHEET_ID,
-    range: sheetName,
+    range: sheetName, // append aan einde van ‘table’ in deze sheet 
     valueInputOption: "RAW",
     requestBody: { values },
   });
@@ -371,7 +402,7 @@ function extractHashFieldsFromObj(raw, gradeId) {
 }
 
 /* ----------------------------
-   Warm-up per grade (zoals clubscript via iframe)
+   Warm-up per grade
 -----------------------------*/
 async function warmupSession(page, { entityId, gradeId, seasonId }) {
   const warmUrl = `https://matchcentre.kncb.nl/matches/?entity=${entityId}&grade=${gradeId}&season=${seasonId}`;
@@ -450,11 +481,10 @@ function getGradeIdFromRow(row) {
   return getFieldValue(row, FIELD_ALIASES.grade_id || ["grade_id","_grade"]);
 }
 
-// Infra-tapjes logging
-async function logStart(sheets, runId, note = "") {
+async function logStart(sheets, runId, version, note = "") {
   await ensureInfra(sheets);
   const start = nowIso();
-  await appendRows(sheets, globalThis.__RUNS_NAME__, [[runId, start, "", SCRIPT_NAME, VERSION, "", "", "", note]]);
+  await appendRows(sheets, globalThis.__RUNS_NAME__, [[runId, start, "", SCRIPT_NAME, version, "", "", "", note]]);
   await appendRows(sheets, globalThis.__LOG_NAME__,  [[runId, start, SCRIPT_NAME, "main", "start", "-", "INFO", `init season=${SEASON_ID}`, note]]);
 }
 async function logError(sheets, runId, func, table, message, detail = "") {
@@ -465,7 +495,7 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
   await ensureInfra(sheets);
   const ts = nowIso();
   await appendRows(sheets, globalThis.__LOG_NAME__,  [[runId, ts, SCRIPT_NAME, "main", "summary", "MASTER", "INFO",
-    `grades=${gradeCount} matches=${matchCount} errors=${errors}`, "" ]]);
+    `version=${VERSION} grades=${gradeCount} matches=${matchCount} errors=${errors}`, "" ]]);
   await appendRows(sheets, globalThis.__RUNS_NAME__, [[runId, "", ts, SCRIPT_NAME, VERSION, gradeCount, matchCount, errors, "ok"]]);
 }
 
@@ -480,6 +510,10 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
   let totalMatches = 0;
 
   try {
+    // Versie bepalen en loggen
+    VERSION = resolveCodeVersion("v1.1-delta-tabs");
+    console.log(`[Version] running build: ${VERSION}`);
+
     if (!IAS_API_KEY) throw new Error("IAS_API_KEY ontbreekt in .env (X-IAS-API-REQUEST verplicht).");
 
     const GRADES_URL = normalizeRvEndpoint("GRADES_JSON_API_ENDPOINT", GRADES_JSON_API_ENDPOINT);
@@ -497,7 +531,7 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
         await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID });
         console.log("✅ Google Sheets auth OK");
         await ensureInfraTabs(sheets);
-        await logStart(sheets, runId);
+        await logStart(sheets, runId, VERSION);
       } catch (e) {
         console.warn("⚠️ Sheets init waarschuwing:", e.message);
       }
@@ -506,13 +540,8 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
     }
 
     if (!DISABLE_SHEETS) {
-      if (!SPREADSHEET_ID) {
-        throw new Error("SPREADSHEET_ID ontbreekt; kan niet naar Google Sheets schrijven.");
-      }
-      if (!sheets) {
-        throw new Error("Sheets client niet beschikbaar na init; kan niet naar Google Sheets schrijven.");
-      }
-      // extra zekerheid: infra nogmaals “soft” garanderen
+      if (!SPREADSHEET_ID) throw new Error("SPREADSHEET_ID ontbreekt; kan niet naar Google Sheets schrijven.");
+      if (!sheets)      throw new Error("Sheets client niet beschikbaar na init; kan niet naar Google Sheets schrijven.");
       await ensureInfra(sheets);
     }
 
@@ -661,7 +690,7 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
     if (masterRowsRaw.length) {
       console.log(`\n📊 Diff & MASTER opbouwen (input: ${masterRowsRaw.length} rijen)…`);
 
-      // Lees vorige MASTER als objecten
+      // Vorige MASTER
       const masterTab = sheets ? await ensureSheet(sheets, MASTER_SHEET) : MASTER_SHEET;
       const prevMaster = sheets ? await readSheetAsObjects(sheets, masterTab) : [];
       const prevById = new Map();
@@ -674,8 +703,8 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
       console.log(`[Diff] New master candidates: ${masterRowsRaw.length}`);
 
       const now = nowIso();
-      const masterById = new Map();   // nieuwe + gedeactiveerde
-      const changeRows = [];          // CHANGES append-values
+      const masterById = new Map();
+      const changeRows = [];
 
       for (const r of masterRowsRaw) {
         const id = getMatchIdFromRow(r);
@@ -683,36 +712,15 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
         const newHash = calcRowHash(r);
         const prev = prevById.get(id);
         if (!prev) {
-          // created
           changeRows.push([runId, now, id, "created", "*", "", newHash, getGradeIdFromRow(r)]);
-          masterById.set(id, {
-            ...r,
-            _hash: newHash,
-            _last_changed_at: now,
-            _last_change_type: "created",
-            _active: 1,
-          });
+          masterById.set(id, { ...r, _hash: newHash, _last_changed_at: now, _last_change_type: "created", _active: 1 });
         } else {
           const prevHash = String(prev._hash || "");
           if (prevHash !== newHash) {
-            // updated
             changeRows.push([runId, now, id, "updated", "*", prevHash, newHash, getGradeIdFromRow(r)]);
-            masterById.set(id, {
-              ...r,
-              _hash: newHash,
-              _last_changed_at: now,
-              _last_change_type: "updated",
-              _active: 1,
-            });
+            masterById.set(id, { ...r, _hash: newHash, _last_changed_at: now, _last_change_type: "updated", _active: 1 });
           } else {
-            // unchanged
-            masterById.set(id, {
-              ...r,
-              _hash: prevHash,
-              _last_changed_at: prev._last_changed_at || "",
-              _last_change_type: prev._last_change_type || "unchanged",
-              _active: 1,
-            });
+            masterById.set(id, { ...r, _hash: prevHash, _last_changed_at: prev._last_changed_at || "", _last_change_type: prev._last_change_type || "unchanged", _active: 1 });
           }
         }
       }
@@ -722,18 +730,11 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
         if (!masterById.has(id)) {
           const nowDel = nowIso();
           changeRows.push([runId, nowDel, id, "deleted", "*", String(prev._hash || ""), "", prev.grade_id || prev._grade || ""]);
-          masterById.set(id, {
-            ...prev,
-            _run_id: runId,
-            _fetched_at: nowDel,
-            _last_changed_at: nowDel,
-            _last_change_type: "deleted",
-            _active: 0,
-          });
+          masterById.set(id, { ...prev, _run_id: runId, _fetched_at: nowDel, _last_changed_at: nowDel, _last_change_type: "deleted", _active: 0 });
         }
       }
 
-      // Schrijf CHANGES
+      // CHANGES
       if (sheets && changeRows.length) {
         const changesTab = await ensureSheet(sheets, CHANGES_SHEET);
         console.log(`[Sheets] CHANGES to append: ${changeRows.length}`);
@@ -741,7 +742,7 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
         console.log(`📝 CHANGES toegevoegd: ${changeRows.length} regels`);
       }
 
-      // Schrijf MASTER (rebuild) + CSV
+      // MASTER
       const masterOut = Array.from(masterById.values());
       console.log(`[Sheets] MASTER to write: ${masterOut.length}`);
       writeCsv("MASTER.csv", masterOut);
@@ -760,11 +761,6 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
     console.error("🛑 FATAAL:", err.message);
     await notifyTelegram(`Fatal error: ${err.message}`);
     try {
-      // probeer alsnog een errorlog te schrijven
-      // (indien sheets init wel lukte)
-      // NB: soft ensureInfra voorkomt 'tab bestaat niet' issues
-      // en gebruikt case-insensitieve namen.
-      // Als sheets null is, slaat dit netjes over.
       if (SPREADSHEET_ID) {
         const sheetsTmp = await getSheetsClient().catch(()=>null);
         if (sheetsTmp) {
@@ -775,7 +771,12 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
     } catch {}
   } finally {
     try {
-      if (sheets) await logSummary(sheets, newRunId(), 0, 0, 0); // harmless fallback log
+      // extra zichtbaarheid van “einde” (niet destructief)
+      // NB: versie staat al in RUNS bij start & summary
+      // hier alleen nog een laatste logSummary fallback
+      // (heeft geen effect als sheets niet bestaat).
+      // Je kunt dit ook verwijderen als je het dubbel vindt.
+      // await logSummary(sheets, newRunId(), 0, 0, 0);
     } catch {}
     if (typeof browser !== "undefined" && browser) {
       await browser.close();
