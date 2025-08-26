@@ -60,6 +60,8 @@ _Automatisch data ophalen van KNCB MatchCentre, wegschrijven naar Google Sheets,
 - Diff-logica: verschilberekeningen tussen runs, inclusief ‘created’, ‘updated’, ‘deleted’ markers, _last_changed en _active.
 - OTA-compatibiliteit: OIDC-authenticatie maakt sleutelbeheer overbodig — veiliger voor open repos.
 - Debugvriendelijk: DISABLE_SHEETS kun je activeren voor tests zonder Google Sheets te raken.
+- Met GRADE_IDS kan je een selectie maken van de grades die je wil scrapen; bijvoorbeeld bij het testen.
+
 ### Verbeterpunten:
 - Healthchecks / dashboards
 - Retry bij 429 / rate-limiting
