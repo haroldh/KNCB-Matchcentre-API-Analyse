@@ -761,7 +761,12 @@ for (let i = 1; i < gradesArr.length; i++) {
     }
 
     // Summary logging
-    if (sheets) await logSummary(sheets, runId, gradesArr.length, totalMatches, errorsCount);
+    if (sheets) {
+      const tmptext =[runId, ts, SCRIPT_NAME, "main", "summary", "MASTER", "INFO",`version=${VERSION} grades=${gradeCount} matches=${matchCount} errors=${errors}`, "" ];
+      console.log(tmptext);
+      await notifyTelegram(tmptext);
+      await logSummary(sheets, runId, gradesArr.length, totalMatches, errorsCount)
+    };
 
     if (VERBOSE >= 1) console.log("\n✅ Klaar!");
   } catch (err) {
