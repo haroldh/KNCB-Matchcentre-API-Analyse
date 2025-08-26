@@ -12,6 +12,7 @@ import axios from "axios";
 import crypto from "node:crypto";
 import { execSync } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
+//import flatten from "json2csv/transforms/flatten";
 
 dotenv.config();
 
@@ -762,7 +763,10 @@ for (let i = 1; i < gradesArr.length; i++) {
 
     // Summary logging
     if (sheets) {
-      const tmptext =[runId, ts, SCRIPT_NAME, "main", "summary", "MASTER", "INFO",`version=${VERSION} grades=${gradeCount} matches=${matchCount} errors=${errors}`, "" ];
+      let timestamp = nowIso();
+      const gradeCount = gradesArr.length;
+      const matchCount = totalMatches;
+      const tmptext =JSON.stringify(['run started='+runId, 'now='+timestamp, 'script='+SCRIPT_NAME, "function=main", "action=summary", "table=MASTER", "level=INFO",'version='+VERSION,'grades='+gradeCount,'matches='+matchCount,'errors='+errorsCount, "" ]);
       console.log(tmptext);
       await notifyTelegram(tmptext);
       await logSummary(sheets, runId, gradesArr.length, totalMatches, errorsCount)
