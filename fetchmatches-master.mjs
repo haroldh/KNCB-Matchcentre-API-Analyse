@@ -766,7 +766,7 @@ for (let i = 1; i < gradesArr.length; i++) {
       let timestamp = nowIso();
       const gradeCount = gradesArr.length;
       const matchCount = totalMatches;
-      const tmptext =JSON.stringify(['run started='+runId, 'now='+timestamp, 'script='+SCRIPT_NAME, "function=main", "action=summary", "table=MASTER", "level=INFO",'version='+VERSION,'grades='+gradeCount,'matches='+matchCount,'errors='+errorsCount, "" ]);
+      const tmptext =JSON.stringify(['run started='+runId, 'now='+timestamp, 'script='+SCRIPT_NAME, "function=main", "action=summary", "table=MASTER", "level=INFO",'version='+VERSION,'grades='+gradeCount,'matches='+matchCount,'errors='+errorsCount,'changes='+changeRows.length, "" ]);
       console.log(tmptext);
       await notifyTelegram(tmptext);
       await logSummary(sheets, runId, gradesArr.length, totalMatches, errorsCount)
