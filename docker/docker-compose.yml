@@ -1,0 +1,59 @@
+services:
+  kncb-fetcher:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: kncb-fetcher
+    restart: "no"                # op Synology kun je via Task Scheduler plannen
+    working_dir: /usr/src/app
+    environment:
+      TZ: "Europe/Amsterdam"
+      NODE_ENV: "production"
+
+      # ---- Google OIDC (Executable-sourced) ----
+      GOOGLE_APPLICATION_CREDENTIALS: "/config/gcp-wif-exec.json"
+      GOOGLE_EXTERNAL_ACCOUNT_ALLOW_EXECUTABLES: "1"   # verplicht bij executable-sourced :contentReference[oaicite:7]{index=7}
+
+      # ---- IdP voor get-oidc.sh ----
+      KC_TOKEN_URL: "${KC_TOKEN_URL}"
+      KC_CLIENT_ID: "${KC_CLIENT_ID}"
+      KC_CLIENT_SECRET: "${KC_CLIENT_SECRET}"
+      KC_AUDIENCE: "${KC_AUDIENCE}"
+
+      # ---- App env (zoals in je .env/GitHub vars) ----
+      SEASON_ID: "${SEASON_ID}"
+      RV_ID: "${RV_ID}"
+      MATCH_REFERRER_URL: "${MATCH_REFERRER_URL}"
+      GRADES_REFERRER_URL: "${GRADES_REFERRER_URL}"
+      SEASONS_REFERRER_URL: "${SEASONS_REFERRER_URL}"
+      API_URL: "${API_URL}"
+      MATCH_JSON_API_ENDPOINT: "${MATCH_JSON_API_ENDPOINT}"
+      GRADES_JSON_API_ENDPOINT: "${GRADES_JSON_API_ENDPOINT}"
+      SEASONS_JSON_API_ENDPOINT: "${SEASONS_JSON_API_ENDPOINT}"
+      CSV_OUTPUT: "${CSV_OUTPUT:-matches.csv}"
+      GRADE_IDS: "${GRADE_IDS}"
+      VERBOSE: "${VERBOSE:-1}"
+      DISABLE_SHEETS: "${DISABLE_SHEETS:-0}"
+      SPREADSHEET_ID: "${SPREADSHEET_ID}"
+      TELEGRAM_BOT_TOKEN: "${TELEGRAM_BOT_TOKEN}"
+      TELEGRAM_CHAT_ID: "${TELEGRAM_CHAT_ID}"
+      IAS_API_KEY: "${IAS_API_KEY}"
+
+    volumes:
+      # Config met credential config JSON
+      - ./docker/config:/config:ro
+      # Executable
+      - ./docker/bin:/usr/src/app/bin:ro
+      # CSV output naar host
+      - ./data:/data
+      # App-bestanden uit repo root
+      - ./fetchmatches-master.mjs:/usr/src/app/fetchmatches-master.mjs:ro
+      - ./package.json:/usr/src/app/package.json:ro
+      - ./package-lock.json:/usr/src/app/package-lock.json:ro
+
+    command: >
+      sh -c "
+        npm ci --omit=dev &&
+        node fetchmatches-master.mjs &&
+        ls -l *.csv /data || true
+      "
