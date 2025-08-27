@@ -12,7 +12,6 @@ import axios from "axios";
 import crypto from "node:crypto";
 import { execSync } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
-//import flatten from "json2csv/transforms/flatten";
 
 dotenv.config();
 
@@ -99,15 +98,14 @@ if (VERBOSE >= 1)
    Script-identiteit & versie
 -----------------------------*/
 const SCRIPT_NAME = "fetchmatches-master.mjs";
-// VERSION wordt dynamisch bepaald via Git/CI:
-let VERSION = "v1"; // fallback; overschreven door resolveCodeVersion()
+let VERSION = "v1"; // fallback
 
 function pickCiSha() {
   const cands = [
     process.env.GIT_COMMIT,
-    process.env.GITHUB_SHA, // GitHub Actions
-    process.env.CI_COMMIT_SHA, // GitLab CI
-    process.env.BITBUCKET_COMMIT, // Bitbucket Pipelines
+    process.env.GITHUB_SHA,
+    process.env.CI_COMMIT_SHA,
+    process.env.BITBUCKET_COMMIT,
     process.env.VERCEL_GIT_COMMIT_SHA,
     process.env.NETLIFY_COMMIT_REF,
   ].filter(Boolean);
@@ -123,15 +121,14 @@ function tryExec(cmd) {
     return null;
   }
 }
-// Git-versie bepalen (CI > describe > rev-parse)
 function resolveCodeVersion(fallback = "v1") {
   const ci = pickCiSha();
   if (ci) return ci;
   const described =
-    tryExec("git describe --tags --always --dirty") || // tag + commits + sha + '-dirty' indien nodig
+    tryExec("git describe --tags --always --dirty") ||
     tryExec("git describe --always --dirty");
   if (described) return described;
-  const shortSha = tryExec("git rev-parse --short HEAD"); // huidige commit hash
+  const shortSha = tryExec("git rev-parse --short HEAD");
   if (shortSha) return shortSha;
   return fallback;
 }
@@ -144,7 +141,6 @@ const LOG_SHEET = "LOG";
 const CHANGES_SHEET = "CHANGES";
 const MASTER_SHEET = "MASTER";
 
-// Hash velden
 const HASH_FIELDS = [
   "match_id",
   "home_name",
@@ -158,7 +154,6 @@ const HASH_FIELDS = [
   "status_id",
 ];
 
-// Alias-kandidaten (fallbacks)
 const FIELD_ALIASES = {
   match_id: ["match_id", "MatchId", "matchId", "id", "Id", "ID", "match.id"],
   home_name: [
@@ -175,33 +170,13 @@ const FIELD_ALIASES = {
     "away",
     "awayTeamName",
   ],
-  grade_id: ["gradeId", "grade_id", "grade.id", "_grade"],
+  grade_id: ["gradeId", "grade_id", "grade.id", "_grade", "GradeId"],
   score_text: ["scoreText", "score_text", "score.fullTime", "result_text"],
   round: ["round", "Round", "round_name", "roundName"],
-  date1: [
-    "date1",
-    "matchDate",
-    "MatchDate",
-    "datetime",
-    "start_utc",
-    "startUtc",
-  ],
+  date1: ["date1", "matchDate", "MatchDate", "datetime", "start_utc", "startUtc"],
   leader_text: ["leaderText", "leader_text", "leaders_text", "leadersText"],
-  venue_name: [
-    "venue.name",
-    "Venue.name",
-    "venue_name",
-    "ground",
-    "Ground",
-    "squadName",
-  ],
-  status_id: [
-    "status_id",
-    "statusId",
-    "match_status_id",
-    "matchStatus",
-    "match_status",
-  ],
+  venue_name: ["venue.name", "Venue.name", "venue_name", "ground", "Ground", "squadName"],
+  status_id: ["status_id", "statusId", "match_status_id", "matchStatus", "match_status"],
 };
 
 /* ----------------------------
@@ -249,7 +224,6 @@ async function getSheetsClient() {
   return google.sheets({ version: "v4", auth: directAuth });
 }
 
-// Case-insensitieve ensureSheet: retourneert feitelijke titel
 async function ensureSheet(sheets, desiredTitle) {
   const resp = await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID });
   const existing = (resp.data.sheets || []).map((s) => s.properties.title);
@@ -275,7 +249,6 @@ async function ensureSheet(sheets, desiredTitle) {
   return desiredTitle;
 }
 
-// Infra-tabs aanmaken/oppakken en feitelijke namen bewaren
 async function ensureInfraTabs(sheets) {
   if (VERBOSE >= 1) console.log("[Sheets] ensureInfraTabs → RUNS/LOG/CHANGES");
   globalThis.__RUNS_NAME__ = await ensureSheet(sheets, RUNS_SHEET);
@@ -319,10 +292,16 @@ async function appendRows(sheets, sheetName, values) {
     console.log(`[Sheets] append rows → ${sheetName} (#${values.length})`);
   await sheets.spreadsheets.values.append({
     spreadsheetId: SPREADSHEET_ID,
-    range: sheetName, // append aan einde van ‘table’ in deze sheet
+    range: sheetName,
     valueInputOption: "RAW",
     requestBody: { values },
   });
+}
+
+function uniqueFields(rows) {
+  const set = new Set();
+  rows.forEach((r) => Object.keys(r).forEach((k) => set.add(k)));
+  return [...set];
 }
 
 async function clearAndWriteObjects(sheets, sheetName, rows) {
@@ -380,11 +359,6 @@ async function readSheetAsObjects(sheets, sheetName) {
 /* ----------------------------
    Utils
 -----------------------------*/
-function uniqueFields(rows) {
-  const set = new Set();
-  rows.forEach((r) => Object.keys(r).forEach((k) => set.add(k)));
-  return [...set];
-}
 function defaultUa() {
   return "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 }
@@ -449,6 +423,12 @@ function buildMatchUrl(baseUrl, { gradeId, seasonId }) {
   if (!u.searchParams.has("strmflg")) u.searchParams.set("strmflg", "1");
   return u.toString();
 }
+
+// --------- NIEUW/GEFIXXT: helpers voor grades sorteren + tabs ordenen ---------
+function _coerceNum(x) {
+  const n = Number(String(x ?? "").replace(/[^\d]+/g, ""));
+  return Number.isFinite(n) ? n : NaN;
+}
 function getGradeId(g) {
   const cands = [
     g?.gradeId,
@@ -462,8 +442,10 @@ function getGradeId(g) {
     g?.grade?.gradeId,
     g?.GradeId,
   ];
-  for (const c of cands)
-    if (c != null && String(c).trim() !== "") return String(c).trim();
+  for (const c of cands) {
+    const n = _coerceNum(c);
+    if (!Number.isNaN(n)) return String(n);
+  }
   return "";
 }
 function getSeasonIdFromGrade(g) {
@@ -472,6 +454,51 @@ function getSeasonIdFromGrade(g) {
     if (c != null && String(c).trim() !== "") return String(c).trim();
   return "";
 }
+function byGradeNumeric(a, b) {
+  return _coerceNum(getGradeId(a)) - _coerceNum(getGradeId(b));
+}
+async function reorderGradeSheets(sheets, spreadsheetId, anchorName = "GRADES") {
+  // Lees alle tabs
+  const { data } = await sheets.spreadsheets.get({ spreadsheetId });
+  const allSheets = data.sheets || [];
+
+  // Bepaal anchor-index
+  const anchor = allSheets.find((s) => s.properties?.title === anchorName);
+  const baseIndex = anchor?.properties?.index ?? 0;
+
+  // Verzamel Grade_* tabs en sorteer op numerieke suffix
+  const gradeSheets = allSheets
+    .map((s) => ({
+      name: s.properties?.title,
+      id: s.properties?.sheetId,
+      index: s.properties?.index,
+    }))
+    .filter((s) => s.name && /^Grade_\d+$/.test(s.name))
+    .map((s) => ({ ...s, gid: _coerceNum(s.name.replace("Grade_", "")) }))
+    .filter((s) => Number.isFinite(s.gid))
+    .sort((a, b) => a.gid - b.gid);
+
+  if (!gradeSheets.length) return;
+
+  const requests = gradeSheets.map((s, i) => ({
+    updateSheetProperties: {
+      properties: {
+        sheetId: s.id,
+        index: baseIndex + 1 + i, // direct ná GRADES
+      },
+      fields: "index",
+    },
+  }));
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: { requests },
+  });
+  if (VERBOSE >= 1)
+    console.log("🧭 Grade_* tabs opnieuw geordend op nummer (ná GRADES).");
+}
+// ------------------------------------------------------------------------------
+
 function writeCsv(filename, rows) {
   if (!rows?.length) return;
   try {
@@ -698,8 +725,8 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
   let totalMatches = 0;
 
   try {
-    // Versie bepalen en loggen
-    VERSION = resolveCodeVersion("v1.1-delta-tabs");
+    VERSION = resolveCodeVersion("v1.2-sorted-grades");
+
     if (VERBOSE >= 0) console.log(`[Version] running build: ${VERSION}`);
 
     if (!IAS_API_KEY)
@@ -811,8 +838,22 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
     if (VERBOSE >= 0)
       console.log(`▶ Gevonden ${gradesArrRaw.length} raw grades`);
 
-    // GRADES → CSV + Sheet
-    const gradesRows = gradesArrRaw.map(flattenObject);
+    // --- NIEUW: sorteer GRADES numeriek op gradeId ---
+    const gradesSorted = gradesArrRaw
+      .filter((g) => getGradeId(g))
+      .sort(byGradeNumeric);
+
+    // GRADES → CSV + Sheet (gesorteerd)
+    const gradesRows = gradesSorted.map((g) => {
+      // flatten, maar behoud id-velden als platte waarden
+      const flat = {};
+      for (const [k, v] of Object.entries(g)) {
+        flat[k] = v !== null && typeof v === "object" ? JSON.stringify(v) : v;
+      }
+      flat._grade_id = getGradeId(g); // expliciet kolommetje voor de sortkey
+      return flat;
+    });
+
     if (gradesRows.length) {
       writeCsv("GRADES.csv", gradesRows);
       if (sheets) {
@@ -820,12 +861,12 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
         await clearAndWriteObjects(sheets, gradesTab, gradesRows);
         if (VERBOSE >= 1)
           console.log(
-            `📈 Sheet "${gradesTab}" geüpdatet (${gradesRows.length} rijen)`
+            `📈 Sheet "${gradesTab}" geüpdatet (${gradesRows.length} rijen, gesorteerd)`
           );
       }
     }
 
-    // Filter
+    // Filter (optioneel)
     const onlyIds = (GRADE_IDS || "")
       .split(",")
       .map((s) => s.trim())
@@ -833,12 +874,8 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
       .map(String);
     if (VERBOSE >= 1) console.log("🔎 Filter GRADE_IDS =", onlyIds);
 
-    const gradesArr = gradesArrRaw.filter((g) => {
+    const gradesArr = gradesSorted.filter((g) => {
       const gid = getGradeId(g);
-      if (!gid) {
-        if (VERBOSE >= 1) console.log("⚠️ Grade zonder id, skip:", g);
-        return false;
-      }
       return !onlyIds.length || onlyIds.includes(gid);
     });
     if (VERBOSE >= 1)
@@ -851,21 +888,19 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
     const masterRowsRaw = [];
     let processed = 0;
 
-    // 2) Per grade wedstrijden
-    for (let i = 1; i < gradesArr.length; i++) {
+    // 2) Per grade wedstrijden (LET OP: start op index 0)
+    for (let i = 0; i < gradesArr.length; i++) {
       const g = gradesArr[i];
-      //  console.log(`Processing grade ${i + 1}/${gradesArr.length}`);
-      // rest van je bestaande code voor grade g ...
-
       const gid = getGradeId(g);
       const seasonInGrade = getSeasonIdFromGrade(g) || SEASON_ID || "";
 
       if (VERBOSE >= 0)
         console.log(
-          `\n${i}/${gradesArr.length}: --- 🔁 Grade ${gid} (season ${
+          `\n${i + 1}/${gradesArr.length}: --- 🔁 Grade ${gid} (season ${
             seasonInGrade || SEASON_ID || "n/a"
           }) ---`
         );
+
       let sheetName = `Grade_${gid}`;
       if (sheets) sheetName = await ensureSheet(sheets, sheetName);
 
@@ -944,21 +979,13 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
 
       const now = nowIso();
       const rows = dataArr.map((obj) => {
-        // 1) haal betekenisvolle velden uit het ruwe object (deep)
         const keyFields = extractHashFieldsFromObj(obj, gid);
-
-        // 2) flatten de rest
         const flat = flattenObject(obj);
-
-        // 3) forceer hash/ID velden in de rij
         for (const [k, v] of Object.entries(keyFields)) flat[k] = v ?? "";
-
-        // 4) metadata
         flat._grade = gid;
         flat._season = seasonInGrade || SEASON_ID || "";
         flat._run_id = runId;
         flat._fetched_at = now;
-
         return flat;
       });
 
@@ -972,10 +999,7 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
       }
 
       processed++;
-      if (
-        REFRESH_REFERRER_EVERY > 0 &&
-        processed % REFRESH_REFERRER_EVERY === 0
-      ) {
+      if (REFRESH_REFERRER_EVERY > 0 && processed % REFRESH_REFERRER_EVERY === 0) {
         if (VERBOSE >= 1)
           console.log("🔄 Sessieverversing: referrer herladen…", refPage);
         try {
@@ -997,14 +1021,8 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
       const masterTab = sheets
         ? await ensureSheet(sheets, MASTER_SHEET)
         : MASTER_SHEET;
-      const prevMaster = sheets
-        ? await readSheetAsObjects(sheets, masterTab)
-        : [];
-      const prevById = new Map();
-      for (const r of prevMaster) {
-        const id = getMatchIdFromRow(r);
-        if (id) prevById.set(id, r);
-      }
+      const prevMaster = sheets ? await readSheetAsObjects(sheets, masterTab) : [];
+      const prevById = new Map(prevMaster.map((r) => [getMatchIdFromRow(r), r]));
 
       if (VERBOSE >= 0)
         console.log(`[Diff] Prev MASTER rows: ${prevMaster.length}`);
@@ -1021,42 +1039,16 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
         const newHash = calcRowHash(r);
         const prev = prevById.get(id);
         if (!prev) {
-          changeRows.push([
-            runId,
-            now,
-            id,
-            "created",
-            "*",
-            "",
-            newHash,
-            getGradeIdFromRow(r),
-          ]);
+          changeRows.push([runId, now, id, "created", "*", "", newHash, getGradeIdFromRow(r)]);
           masterById.set(id, {
-            ...r,
-            _hash: newHash,
-            _last_changed_at: now,
-            _last_change_type: "created",
-            _active: 1,
+            ...r, _hash: newHash, _last_changed_at: now, _last_change_type: "created", _active: 1,
           });
         } else {
           const prevHash = String(prev._hash || "");
           if (prevHash !== newHash) {
-            changeRows.push([
-              runId,
-              now,
-              id,
-              "updated",
-              "*",
-              prevHash,
-              newHash,
-              getGradeIdFromRow(r),
-            ]);
+            changeRows.push([runId, now, id, "updated", "*", prevHash, newHash, getGradeIdFromRow(r)]);
             masterById.set(id, {
-              ...r,
-              _hash: newHash,
-              _last_changed_at: now,
-              _last_change_type: "updated",
-              _active: 1,
+              ...r, _hash: newHash, _last_changed_at: now, _last_change_type: "updated", _active: 1,
             });
           } else {
             masterById.set(id, {
@@ -1074,16 +1066,7 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
       for (const [id, prev] of prevById.entries()) {
         if (!masterById.has(id)) {
           const nowDel = nowIso();
-          changeRows.push([
-            runId,
-            nowDel,
-            id,
-            "deleted",
-            "*",
-            String(prev._hash || ""),
-            "",
-            prev.grade_id || prev._grade || "",
-          ]);
+          changeRows.push([runId, nowDel, id, "deleted", "*", String(prev._hash || ""), "", prev.grade_id || prev._grade || ""]);
           masterById.set(id, {
             ...prev,
             _run_id: runId,
@@ -1098,23 +1081,28 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
       // CHANGES
       if (sheets && changeRows.length) {
         const changesTab = await ensureSheet(sheets, CHANGES_SHEET);
-        
-        if (VERBOSE >= 0)
-          console.log(`[Sheets] CHANGES to append: ${changeRows.length}`);
+        if (VERBOSE >= 0) console.log(`[Sheets] CHANGES to append: ${changeRows.length}`);
         await appendRows(sheets, changesTab, changeRows);
-        if (VERBOSE >= 0)
-          console.log(`📝 CHANGES toegevoegd: ${changeRows.length} regels`);
+        if (VERBOSE >= 0) console.log(`📝 CHANGES toegevoegd: ${changeRows.length} regels`);
       }
 
       // MASTER
       const masterOut = Array.from(masterById.values());
-      if (VERBOSE >= 0)
-        console.log(`[Sheets] MASTER to write: ${masterOut.length}`);
+      if (VERBOSE >= 0) console.log(`[Sheets] MASTER to write: ${masterOut.length}`);
       writeCsv("MASTER.csv", masterOut);
       if (sheets) {
         const masterResolved = await ensureSheet(sheets, MASTER_SHEET);
         await clearAndWriteObjects(sheets, masterResolved, masterOut);
         if (VERBOSE >= 0) console.log("📈 MASTER sheet bijgewerkt");
+      }
+    }
+
+    // --- NIEUW: Grade_* tabs herschikken ná GRADES, gesorteerd ---
+    if (sheets) {
+      try {
+        await reorderGradeSheets(sheets, SPREADSHEET_ID, "GRADES");
+      } catch (e) {
+        console.warn("⚠️ Herordenen Grade_* tabs mislukt:", e?.message || e);
       }
     }
 
@@ -1139,13 +1127,7 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
       ]);
       console.log(tmptext);
       await notifyTelegram(tmptext);
-      await logSummary(
-        sheets,
-        runId,
-        gradesArr.length,
-        totalMatches,
-        errorsCount
-      );
+      await logSummary(sheets, runId, gradeCount, matchCount, errorsCount);
     }
 
     if (VERBOSE >= 1) console.log("\n✅ Klaar!");
@@ -1175,12 +1157,7 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
     } catch {}
   } finally {
     try {
-      // extra zichtbaarheid van “einde” (niet destructief)
-      // NB: versie staat al in RUNS bij start & summary
-      // hier alleen nog een laatste logSummary fallback
-      // (heeft geen effect als sheets niet bestaat).
-      // Je kunt dit ook verwijderen als je het dubbel vindt.
-      // await logSummary(sheets, newRunId(), 0, 0, 0);
+      // no-op
     } catch {}
     if (typeof browser !== "undefined" && browser) {
       await browser.close();
