@@ -874,7 +874,7 @@ for (let i = 1; i < sortedGradeIds.length; i++) {
   }
 
   // ...rest van je bestaande code (warmup, matchUrl bouwen, fetchen, schrijven, etc.)
-}
+
       let sheetName = `Grade_${gid}`;
       if (sheets) sheetName = await ensureSheet(sheets, sheetName);
 
