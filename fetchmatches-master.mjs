@@ -864,7 +864,7 @@ const sortedGradeIds = gradesSorted.map(g => String(getGradeId(g)));
 
     // 2) Per grade wedstrijden
     // Vervang je huidige for-lus over grades door:
-for (let i = 1; i < sortedGradeIds.length; i++) {
+for (let i = 0; i < sortedGradeIds.length; i++) {
   const gid = sortedGradeIds[i];
   const g = gradesSorted[i]; // het volledige grade-object indien je het nodig hebt
   const seasonInGrade = getSeasonIdFromGrade(g) || SEASON_ID || "";
