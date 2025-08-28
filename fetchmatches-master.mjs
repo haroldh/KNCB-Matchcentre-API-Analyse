@@ -797,44 +797,53 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
     await delay(SLOWDOWN_MS);
 
     // 1) GRADES ophalen
-// 1) GRADES ophalen
-if (VERBOSE >= 1) console.log("📥 Haal grades op…");
-const gradesJson = await fetchJsonInPage(page, GRADES_URL.toString(), refPage, "grades");
-if (gradesJson?.__error) throw new Error(`Grades endpoint error: ${gradesJson.__error}`);
+    // 1) GRADES ophalen
+    if (VERBOSE >= 1) console.log("📥 Haal grades op…");
+    const gradesJson = await fetchJsonInPage(
+      page,
+      GRADES_URL.toString(),
+      refPage,
+      "grades"
+    );
+    if (gradesJson?.__error)
+      throw new Error(`Grades endpoint error: ${gradesJson.__error}`);
 
-const gradesArrRaw = extractArray(gradesJson) || [];
-if (VERBOSE >= 0) console.log(`▶ Gevonden ${gradesArrRaw.length} raw grades`);
+    const gradesArrRaw = extractArray(gradesJson) || [];
+    if (VERBOSE >= 0)
+      console.log(`▶ Gevonden ${gradesArrRaw.length} raw grades`);
 
-// 👉 Sorteer de grades numeriek op (afgeleide) gradeId
-function _coerceNum(x) {
-  const n = Number(String(x ?? "").replace(/[^\d]+/g, ""));
-  return Number.isFinite(n) ? n : NaN;
-}
-function byGradeNumeric(a, b) {
-  const ag = _coerceNum(getGradeId(a));
-  const bg = _coerceNum(getGradeId(b));
-  return ag - bg;
-}
-const gradesSorted = gradesArrRaw
-  .filter(g => getGradeId(g))       // alleen items met id
-  .sort(byGradeNumeric);            // netjes oplopend
+    // 👉 Sorteer de grades numeriek op (afgeleide) gradeId
+    function _coerceNum(x) {
+      const n = Number(String(x ?? "").replace(/[^\d]+/g, ""));
+      return Number.isFinite(n) ? n : NaN;
+    }
+    function byGradeNumeric(a, b) {
+      const ag = _coerceNum(getGradeId(a));
+      const bg = _coerceNum(getGradeId(b));
+      return ag - bg;
+    }
+    const gradesSorted = gradesArrRaw
+      .filter((g) => getGradeId(g)) // alleen items met id
+      .sort(byGradeNumeric); // netjes oplopend
 
-// Flatten voor CSV/Sheet (let i.p.v. const, géén reassignment meer nodig)
-let gradesRows = gradesSorted.map(flattenObject);
+    // Flatten voor CSV/Sheet (let i.p.v. const, géén reassignment meer nodig)
+    let gradesRows = gradesSorted.map(flattenObject);
 
-// Schrijf GRADES.csv en Sheet in gesorteerde volgorde
-if (gradesRows.length) {
-  writeCsv("GRADES.csv", gradesRows);
-  if (sheets) {
-    const gradesTab = await ensureSheet(sheets, "GRADES");
-    await clearAndWriteObjects(sheets, gradesTab, gradesRows);
-    if (VERBOSE >= 1) console.log(`📈 Sheet "${gradesTab}" geüpdatet (${gradesRows.length} rijen, gesorteerd)`);
-  }
-}
+    // Schrijf GRADES.csv en Sheet in gesorteerde volgorde
+    if (gradesRows.length) {
+      writeCsv("GRADES.csv", gradesRows);
+      if (sheets) {
+        const gradesTab = await ensureSheet(sheets, "GRADES");
+        await clearAndWriteObjects(sheets, gradesTab, gradesRows);
+        if (VERBOSE >= 1)
+          console.log(
+            `📈 Sheet "${gradesTab}" geüpdatet (${gradesRows.length} rijen, gesorteerd)`
+          );
+      }
+    }
 
-// Bouw óók een gesorteerde lijst van losse id’s voor de per-grade loop
-const sortedGradeIds = gradesSorted.map(g => String(getGradeId(g)));
-
+    // Bouw óók een gesorteerde lijst van losse id’s voor de per-grade loop
+    const sortedGradeIds = gradesSorted.map((g) => String(getGradeId(g)));
 
     // Filter
     const onlyIds = (GRADE_IDS || "")
@@ -864,21 +873,25 @@ const sortedGradeIds = gradesSorted.map(g => String(getGradeId(g)));
 
     // 2) Per grade wedstrijden
     // Vervang je huidige for-lus over grades door:
-for (let i = 0; i < sortedGradeIds.length; i++) {
-  const gid = sortedGradeIds[i];
-  const g = gradesSorted[i]; // het volledige grade-object indien je het nodig hebt
-  const seasonInGrade = getSeasonIdFromGrade(g) || SEASON_ID || "";
+    for (let i = 0; i < sortedGradeIds.length; i++) {
+      const gid = sortedGradeIds[i];
+      const g = gradesSorted[i]; // het volledige grade-object indien je het nodig hebt
+      const seasonInGrade = getSeasonIdFromGrade(g) || SEASON_ID || "";
 
-  if (VERBOSE >= 0) {
-    console.log(`\n${i + 1}/${sortedGradeIds.length}: --- 🔁 Grade ${gid} (season ${seasonInGrade || SEASON_ID || "n/a"}) ---`);
-  }
+      if (VERBOSE >= 0) {
+        console.log(
+          `\n${i + 1}/${sortedGradeIds.length}: --- 🔁 Grade ${gid} (season ${
+            seasonInGrade || SEASON_ID || "n/a"
+          }) ---`
+        );
+      }
 
-  // ...rest van je bestaande code (warmup, matchUrl bouwen, fetchen, schrijven, etc.)
+      // ...rest van je bestaande code (warmup, matchUrl bouwen, fetchen, schrijven, etc.)
 
       let sheetName = `Grade_${gid}`;
       if (sheets) sheetName = await ensureSheet(sheets, sheetName);
 
-      // Warm-up per grade      
+      // Warm-up per grade
       const entityId = String(process.env.RV_ID || "134453");
       await warmupSession(page, {
         entityId,
