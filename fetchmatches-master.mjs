@@ -814,7 +814,7 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
     // GRADES → CSV + Sheet
     const gradesRows = gradesArrRaw.map(flattenObject);
     if (gradesRows.length) {
-      gradesRows=gradesRows.sort((a,b) => a - b);
+      //gradesRows = gradesRows.sort((a, b) => a - b);
       writeCsv("GRADES.csv", gradesRows);
       if (sheets) {
         const gradesTab = await ensureSheet(sheets, "GRADES");
@@ -1099,7 +1099,7 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
       // CHANGES
       if (sheets && changeRows.length) {
         const changesTab = await ensureSheet(sheets, CHANGES_SHEET);
-        
+
         if (VERBOSE >= 0)
           console.log(`[Sheets] CHANGES to append: ${changeRows.length}`);
         await appendRows(sheets, changesTab, changeRows);
@@ -1122,10 +1122,10 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
     // Summary logging
     if (sheets) {
       let timestamp = nowIso();
-      const gradeCount = gradesArr.length;
-      const matchCount = totalMatches;
+      let gradeCount = gradesArr.length;
+      let matchCount = totalMatches;
 
-      const tmptext = JSON.stringify([
+      let tmptext = JSON.stringify([
         "run started=" + runId,
         "now=" + timestamp,
         "script=" + SCRIPT_NAME,
