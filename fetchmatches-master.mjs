@@ -12,7 +12,6 @@ import axios from "axios";
 import crypto from "node:crypto";
 import { execSync } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
-//import flatten from "json2csv/transforms/flatten";
 
 dotenv.config();
 
@@ -82,32 +81,24 @@ const USE_NODE_FETCH_ON_401 =
   String(process.env.USE_NODE_FETCH_ON_401 ?? "0") === "1";
 const SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
 
+/* ----------------------------
+   Alg. helpers
+-----------------------------*/
 const jitter = (ms) => ms + Math.floor(Math.random() * RETRY_JITTER_MS);
 const backoffMs = (a) => jitter(RETRY_BASE_DELAY_MS * Math.pow(2, a - 1));
-
-// --- sanity logging over sheets-config ---
-if (VERBOSE >= 1)
-  console.log(
-    `[Sheets] SPREADSHEET_ID present: ${Boolean(process.env.SPREADSHEET_ID)}`
-  );
-if (VERBOSE >= 1)
-  console.log(
-    `[Sheets] DISABLE_SHEETS: ${String(process.env.DISABLE_SHEETS ?? "0")}`
-  );
 
 /* ----------------------------
    Script-identiteit & versie
 -----------------------------*/
 const SCRIPT_NAME = "fetchmatches-master.mjs";
-// VERSION wordt dynamisch bepaald via Git/CI:
-let VERSION = "v1"; // fallback; overschreven door resolveCodeVersion()
+let VERSION = "v1"; // fallback
 
 function pickCiSha() {
   const cands = [
     process.env.GIT_COMMIT,
-    process.env.GITHUB_SHA, // GitHub Actions
-    process.env.CI_COMMIT_SHA, // GitLab CI
-    process.env.BITBUCKET_COMMIT, // Bitbucket Pipelines
+    process.env.GITHUB_SHA,
+    process.env.CI_COMMIT_SHA,
+    process.env.BITBUCKET_COMMIT,
     process.env.VERCEL_GIT_COMMIT_SHA,
     process.env.NETLIFY_COMMIT_REF,
   ].filter(Boolean);
@@ -123,15 +114,14 @@ function tryExec(cmd) {
     return null;
   }
 }
-// Git-versie bepalen (CI > describe > rev-parse)
 function resolveCodeVersion(fallback = "v1") {
   const ci = pickCiSha();
   if (ci) return ci;
   const described =
-    tryExec("git describe --tags --always --dirty") || // tag + commits + sha + '-dirty' indien nodig
+    tryExec("git describe --tags --always --dirty") ||
     tryExec("git describe --always --dirty");
   if (described) return described;
-  const shortSha = tryExec("git rev-parse --short HEAD"); // huidige commit hash
+  const shortSha = tryExec("git rev-parse --short HEAD");
   if (shortSha) return shortSha;
   return fallback;
 }
@@ -144,7 +134,6 @@ const LOG_SHEET = "LOG";
 const CHANGES_SHEET = "CHANGES";
 const MASTER_SHEET = "MASTER";
 
-// Hash velden
 const HASH_FIELDS = [
   "match_id",
   "home_name",
@@ -158,7 +147,6 @@ const HASH_FIELDS = [
   "status_id",
 ];
 
-// Alias-kandidaten (fallbacks)
 const FIELD_ALIASES = {
   match_id: ["match_id", "MatchId", "matchId", "id", "Id", "ID", "match.id"],
   home_name: [
@@ -175,7 +163,7 @@ const FIELD_ALIASES = {
     "away",
     "awayTeamName",
   ],
-  grade_id: ["gradeId", "grade_id", "grade.id", "_grade"],
+  grade_id: ["gradeId", "grade_id", "grade.id", "_grade", "GradeId"],
   score_text: ["scoreText", "score_text", "score.fullTime", "result_text"],
   round: ["round", "Round", "round_name", "roundName"],
   date1: [
@@ -195,13 +183,7 @@ const FIELD_ALIASES = {
     "Ground",
     "squadName",
   ],
-  status_id: [
-    "status_id",
-    "statusId",
-    "match_status_id",
-    "matchStatus",
-    "match_status",
-  ],
+  status_id: ["status_id", "statusId", "match_status_id", "matchStatus", "match_status"],
 };
 
 /* ----------------------------
@@ -249,7 +231,6 @@ async function getSheetsClient() {
   return google.sheets({ version: "v4", auth: directAuth });
 }
 
-// Case-insensitieve ensureSheet: retourneert feitelijke titel
 async function ensureSheet(sheets, desiredTitle) {
   const resp = await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID });
   const existing = (resp.data.sheets || []).map((s) => s.properties.title);
@@ -275,7 +256,6 @@ async function ensureSheet(sheets, desiredTitle) {
   return desiredTitle;
 }
 
-// Infra-tabs aanmaken/oppakken en feitelijke namen bewaren
 async function ensureInfraTabs(sheets) {
   if (VERBOSE >= 1) console.log("[Sheets] ensureInfraTabs → RUNS/LOG/CHANGES");
   globalThis.__RUNS_NAME__ = await ensureSheet(sheets, RUNS_SHEET);
@@ -319,10 +299,16 @@ async function appendRows(sheets, sheetName, values) {
     console.log(`[Sheets] append rows → ${sheetName} (#${values.length})`);
   await sheets.spreadsheets.values.append({
     spreadsheetId: SPREADSHEET_ID,
-    range: sheetName, // append aan einde van ‘table’ in deze sheet
+    range: sheetName,
     valueInputOption: "RAW",
     requestBody: { values },
   });
+}
+
+function uniqueFields(rows) {
+  const set = new Set();
+  rows.forEach((r) => Object.keys(r).forEach((k) => set.add(k)));
+  return [...set];
 }
 
 async function clearAndWriteObjects(sheets, sheetName, rows) {
@@ -361,6 +347,9 @@ async function readSheetAsObjects(sheets, sheetName) {
     const resp = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
       range: sheetName,
+      // <<< belangrijk: ruwe waarden, geen locale formatting
+      valueRenderOption: 'UNFORMATTED_VALUE',
+      dateTimeRenderOption: 'FORMATTED_STRING',
     });
     const values = resp.data.values || [];
     if (!values.length) return [];
@@ -377,14 +366,57 @@ async function readSheetAsObjects(sheets, sheetName) {
   }
 }
 
-/* ----------------------------
-   Utils
------------------------------*/
-function uniqueFields(rows) {
-  const set = new Set();
-  rows.forEach((r) => Object.keys(r).forEach((k) => set.add(k)));
-  return [...set];
+// Helpers to enforce TEXT formatting on specific headers to prevent number/date coercion
+async function getSheetMetaByTitle(sheets, spreadsheetId, title) {
+  const { data } = await sheets.spreadsheets.get({ spreadsheetId });
+  const sh = (data.sheets || []).find(s => s.properties?.title === title);
+  return sh ? { sheetId: sh.properties.sheetId, sheetTitle: title } : null;
 }
+async function findHeaderMap(sheets, sheetName) {
+  const resp = await sheets.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    range: `${sheetName}!1:1`,
+    valueRenderOption: 'UNFORMATTED_VALUE',
+  });
+  const headers = (resp.data.values && resp.data.values[0]) || [];
+  const map = new Map();
+  headers.forEach((h, i) => map.set(String(h || '').toLowerCase(), i));
+  return map;
+}
+async function applyPlainTextFormatForHeaders(sheets, sheetName, headerNames) {
+  if (!sheets) return;
+  const meta = await getSheetMetaByTitle(sheets, SPREADSHEET_ID, sheetName);
+  if (!meta) return;
+  const headerMap = await findHeaderMap(sheets, sheetName);
+  const sheetId = meta.sheetId;
+  const requests = [];
+  for (const hn of headerNames) {
+    const idx = headerMap.get(hn.toLowerCase());
+    if (idx == null) continue;
+    requests.push({
+      repeatCell: {
+        range: {
+          sheetId,
+          startRowIndex: 1,
+          startColumnIndex: idx,
+          endColumnIndex: idx + 1,
+        },
+        cell: { userEnteredFormat: { numberFormat: { type: 'TEXT' } } },
+        fields: 'userEnteredFormat.numberFormat',
+      }
+    });
+  }
+  if (requests.length) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: SPREADSHEET_ID,
+      requestBody: { requests }
+    });
+  }
+}
+
+/* ----------------------------
+   Diverse utils
+-----------------------------*/
 function defaultUa() {
   return "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 }
@@ -449,6 +481,7 @@ function buildMatchUrl(baseUrl, { gradeId, seasonId }) {
   if (!u.searchParams.has("strmflg")) u.searchParams.set("strmflg", "1");
   return u.toString();
 }
+
 function getGradeId(g) {
   const cands = [
     g?.gradeId,
@@ -462,8 +495,10 @@ function getGradeId(g) {
     g?.grade?.gradeId,
     g?.GradeId,
   ];
-  for (const c of cands)
-    if (c != null && String(c).trim() !== "") return String(c).trim();
+  for (const c of cands) {
+    const n = Number(String(c ?? "").replace(/[^\d]+/g, ""));
+    if (Number.isFinite(n)) return String(n);
+  }
   return "";
 }
 function getSeasonIdFromGrade(g) {
@@ -471,19 +506,6 @@ function getSeasonIdFromGrade(g) {
   for (const c of cands)
     if (c != null && String(c).trim() !== "") return String(c).trim();
   return "";
-}
-function writeCsv(filename, rows) {
-  if (!rows?.length) return;
-  try {
-    const fields = uniqueFields(rows);
-    const csv = parse(rows, { fields, defaultValue: "" });
-    fs.writeFileSync(filename, csv, "utf8");
-    if (VERBOSE >= 1)
-      console.log(`💾 ${filename} geschreven (${rows.length} rijen)`);
-  } catch (e) {
-    if (VERBOSE >= 0)
-      console.warn(`⚠️ Kon ${filename} niet schrijven:`, e.message);
-  }
 }
 
 /* ----------------------------
@@ -554,18 +576,15 @@ async function fetchJsonInPage(page, url, refPageUrl, label) {
     async (u, ref, ias) => {
       try {
         const res = await fetch(u, {
-          credentials: "include",
+          credentials: "omit",
           referrer: ref,
           referrerPolicy: "strict-origin-when-cross-origin",
           headers: {
-            Accept: "application/json, text/plain;q=0.8, */*;q=0.5",
+            Accept: "application/json",
             "X-IAS-API-REQUEST": ias,
-            "x-requested-with": "XMLHttpRequest",
-            "cache-control": "no-cache",
-            pragma: "no-cache",
           },
           method: "GET",
-          mode: "cors",
+          cache: "no-store",
         });
         const text = await res.text();
         if (!res.ok)
@@ -666,7 +685,7 @@ async function logError(sheets, runId, func, table, message, detail = "") {
     ],
   ]);
 }
-async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
+async function logSummary(sheets, runId, gradeCount, matchCount, errors, ch) {
   await ensureInfra(sheets);
   const ts = nowIso();
   await appendRows(sheets, globalThis.__LOG_NAME__, [
@@ -678,13 +697,26 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
       "summary",
       "MASTER",
       "INFO",
-      `version=${VERSION} grades=${gradeCount} matches=${matchCount} errors=${errors}`,
+      `version=${VERSION} grades=${gradeCount} matches=${matchCount} changes=${ch?.total ?? 0} (c=${ch?.created ?? 0}, u=${ch?.updated ?? 0}, d=${ch?.deleted ?? 0}) errors=${errors}`,
       "",
     ],
   ]);
   await appendRows(sheets, globalThis.__RUNS_NAME__, [
     [runId, "", ts, SCRIPT_NAME, VERSION, gradeCount, matchCount, errors, "ok"],
   ]);
+}
+
+// Telt created/updated/deleted uit de CHANGES-rows.
+// Verwacht rijen: [runId, ts, match_id, change_type, '*', old_hash, new_hash, grade_id]
+function countChanges(changeRows) {
+  let created = 0, updated = 0, deleted = 0;
+  for (const r of (changeRows || [])) {
+    const t = String(r[3] || '').toLowerCase();
+    if (t === 'created') created++;
+    else if (t === 'updated') updated++;
+    else if (t === 'deleted') deleted++;
+  }
+  return { created, updated, deleted, total: created + updated + deleted };
 }
 
 /* ----------------------------
@@ -696,10 +728,11 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
   const runId = newRunId();
   let errorsCount = 0;
   let totalMatches = 0;
+  let changeSummary = { created: 0, updated: 0, deleted: 0, total: 0 }; // ← voor eindmelding
 
   try {
-    // Versie bepalen en loggen
-    VERSION = resolveCodeVersion("v1.1-delta-tabs");
+    VERSION = resolveCodeVersion("v1.4-telegram-change-count");
+
     if (VERBOSE >= 0) console.log(`[Version] running build: ${VERSION}`);
 
     if (!IAS_API_KEY)
@@ -797,7 +830,6 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
     await delay(SLOWDOWN_MS);
 
     // 1) GRADES ophalen
-    // 1) GRADES ophalen
     if (VERBOSE >= 1) console.log("📥 Haal grades op…");
     const gradesJson = await fetchJsonInPage(
       page,
@@ -812,24 +844,8 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
     if (VERBOSE >= 0)
       console.log(`▶ Gevonden ${gradesArrRaw.length} raw grades`);
 
-    // 👉 Sorteer de grades numeriek op (afgeleide) gradeId
-    function _coerceNum(x) {
-      const n = Number(String(x ?? "").replace(/[^\d]+/g, ""));
-      return Number.isFinite(n) ? n : NaN;
-    }
-    function byGradeNumeric(a, b) {
-      const ag = _coerceNum(getGradeId(a));
-      const bg = _coerceNum(getGradeId(b));
-      return ag - bg;
-    }
-    const gradesSorted = gradesArrRaw
-      .filter((g) => getGradeId(g)) // alleen items met id
-      .sort(byGradeNumeric); // netjes oplopend
-
-    // Flatten voor CSV/Sheet (let i.p.v. const, géén reassignment meer nodig)
-    let gradesRows = gradesSorted.map(flattenObject);
-
-    // Schrijf GRADES.csv en Sheet in gesorteerde volgorde
+    // GRADES → CSV + Sheet
+    const gradesRows = gradesArrRaw.map(flattenObject);
     if (gradesRows.length) {
       writeCsv("GRADES.csv", gradesRows);
       if (sheets) {
@@ -837,13 +853,16 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
         await clearAndWriteObjects(sheets, gradesTab, gradesRows);
         if (VERBOSE >= 1)
           console.log(
-            `📈 Sheet "${gradesTab}" geüpdatet (${gradesRows.length} rijen, gesorteerd)`
+            `📈 Sheet "${gradesTab}" geüpdatet (${gradesRows.length} rijen)`
           );
+        // Forceer tekstopmaak voor id-kolommen in GRADES
+        await applyPlainTextFormatForHeaders(
+          sheets,
+          gradesTab,
+          ["gradeId", "grade_id", "_grade_id", "id", "ID", "Id"]
+        );
       }
     }
-
-    // Bouw óók een gesorteerde lijst van losse id’s voor de per-grade loop
-    const sortedGradeIds = gradesSorted.map((g) => String(getGradeId(g)));
 
     // Filter
     const onlyIds = (GRADE_IDS || "")
@@ -856,7 +875,7 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
     const gradesArr = gradesArrRaw.filter((g) => {
       const gid = getGradeId(g);
       if (!gid) {
-        if (VERBOSE >= 1) console.log("⚠️ Grade zonder id, skip:", g);
+        if (VERBOSE >= 1) console.log("⚠️ Grade zonder bruikbare id overgeslagen");
         return false;
       }
       return !onlyIds.length || onlyIds.includes(gid);
@@ -872,21 +891,17 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
     let processed = 0;
 
     // 2) Per grade wedstrijden
-    // Vervang je huidige for-lus over grades door:
-    for (let i = 0; i < sortedGradeIds.length; i++) {
-      const gid = sortedGradeIds[i];
-      const g = gradesSorted[i]; // het volledige grade-object indien je het nodig hebt
+    for (let i = 0; i < gradesArr.length; i++) {
+      const g = gradesArr[i];
+      const gid = getGradeId(g);
       const seasonInGrade = getSeasonIdFromGrade(g) || SEASON_ID || "";
 
-      if (VERBOSE >= 0) {
+      if (VERBOSE >= 0)
         console.log(
-          `\n${i + 1}/${sortedGradeIds.length}: --- 🔁 Grade ${gid} (season ${
+          `\n${i + 1}/${gradesArr.length}: --- 🔁 Grade ${gid} (season ${
             seasonInGrade || SEASON_ID || "n/a"
           }) ---`
         );
-      }
-
-      // ...rest van je bestaande code (warmup, matchUrl bouwen, fetchen, schrijven, etc.)
 
       let sheetName = `Grade_${gid}`;
       if (sheets) sheetName = await ensureSheet(sheets, sheetName);
@@ -899,7 +914,6 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
         seasonId: seasonInGrade || SEASON_ID,
       });
 
-      // Matches URL + fetch
       const matchUrl = buildMatchUrl(MATCH_URL, {
         gradeId: gid,
         seasonId: seasonInGrade || SEASON_ID,
@@ -966,21 +980,17 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
 
       const now = nowIso();
       const rows = dataArr.map((obj) => {
-        // 1) haal betekenisvolle velden uit het ruwe object (deep)
         const keyFields = extractHashFieldsFromObj(obj, gid);
-
-        // 2) flatten de rest
         const flat = flattenObject(obj);
-
-        // 3) forceer hash/ID velden in de rij
         for (const [k, v] of Object.entries(keyFields)) flat[k] = v ?? "";
-
-        // 4) metadata
+        // harde cast voor stabiliteit in Sheets
+        flat.match_id = String(flat.match_id ?? keyFields.match_id ?? "");
+        flat.grade_id = String(flat.grade_id ?? keyFields.grade_id ?? gid ?? "");
+        flat.status_id = String(flat.status_id ?? keyFields.status_id ?? "");
         flat._grade = gid;
         flat._season = seasonInGrade || SEASON_ID || "";
         flat._run_id = runId;
         flat._fetched_at = now;
-
         return flat;
       });
 
@@ -989,6 +999,12 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
         if (sheets) {
           await clearAndWriteObjects(sheets, sheetName, rows);
           if (VERBOSE >= 1) console.log(`📈 Sheet "${sheetName}" geüpdatet`);
+          // Forceer TEXT op id-kolommen
+          await applyPlainTextFormatForHeaders(
+            sheets,
+            sheetName,
+            ["match_id", "grade_id", "status_id", "_grade", "_season", "_hash", "_run_id"]
+          );
         }
         masterRowsRaw.push(...rows);
       }
@@ -1019,14 +1035,8 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
       const masterTab = sheets
         ? await ensureSheet(sheets, MASTER_SHEET)
         : MASTER_SHEET;
-      const prevMaster = sheets
-        ? await readSheetAsObjects(sheets, masterTab)
-        : [];
-      const prevById = new Map();
-      for (const r of prevMaster) {
-        const id = getMatchIdFromRow(r);
-        if (id) prevById.set(id, r);
-      }
+      const prevMaster = sheets ? await readSheetAsObjects(sheets, masterTab) : [];
+      const prevById = new Map(prevMaster.map((r) => [getMatchIdFromRow(r), r]));
 
       if (VERBOSE >= 0)
         console.log(`[Diff] Prev MASTER rows: ${prevMaster.length}`);
@@ -1043,42 +1053,16 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
         const newHash = calcRowHash(r);
         const prev = prevById.get(id);
         if (!prev) {
-          changeRows.push([
-            runId,
-            now,
-            id,
-            "created",
-            "*",
-            "",
-            newHash,
-            getGradeIdFromRow(r),
-          ]);
+          changeRows.push([runId, now, id, "created", "*", "", newHash, getGradeIdFromRow(r)]);
           masterById.set(id, {
-            ...r,
-            _hash: newHash,
-            _last_changed_at: now,
-            _last_change_type: "created",
-            _active: 1,
+            ...r, _hash: newHash, _last_changed_at: now, _last_change_type: "created", _active: 1,
           });
         } else {
           const prevHash = String(prev._hash || "");
           if (prevHash !== newHash) {
-            changeRows.push([
-              runId,
-              now,
-              id,
-              "updated",
-              "*",
-              prevHash,
-              newHash,
-              getGradeIdFromRow(r),
-            ]);
+            changeRows.push([runId, now, id, "updated", "*", prevHash, newHash, getGradeIdFromRow(r)]);
             masterById.set(id, {
-              ...r,
-              _hash: newHash,
-              _last_changed_at: now,
-              _last_change_type: "updated",
-              _active: 1,
+              ...r, _hash: newHash, _last_changed_at: now, _last_change_type: "updated", _active: 1,
             });
           } else {
             masterById.set(id, {
@@ -1096,16 +1080,7 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
       for (const [id, prev] of prevById.entries()) {
         if (!masterById.has(id)) {
           const nowDel = nowIso();
-          changeRows.push([
-            runId,
-            nowDel,
-            id,
-            "deleted",
-            "*",
-            String(prev._hash || ""),
-            "",
-            prev.grade_id || prev._grade || "",
-          ]);
+          changeRows.push([runId, nowDel, id, "deleted", "*", String(prev._hash || ""), "", prev.grade_id || prev._grade || ""]);
           masterById.set(id, {
             ...prev,
             _run_id: runId,
@@ -1117,57 +1092,74 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
         }
       }
 
+      // >>> Nieuw: changes tellen en ALTIJD melden via Telegram + LOG
+      changeSummary = countChanges(changeRows);
+      try {
+        const msg = `🧾 Run ${runId} • changes: ${changeSummary.total} (created ${changeSummary.created}, updated ${changeSummary.updated}, deleted ${changeSummary.deleted})`;
+        await notifyTelegram(msg);
+        if (sheets) {
+          await appendRows(sheets, globalThis.__LOG_NAME__ || 'LOG', [
+            [runId, nowIso(), SCRIPT_NAME, 'diff', 'changes', 'CHANGES', 'INFO', msg, '']
+          ]);
+        }
+      } catch (e) {
+        if (VERBOSE >= 0) console.warn('⚠️ Telegram/LOG changes melding faalde:', e?.message || e);
+      }
+
       // CHANGES
       if (sheets && changeRows.length) {
         const changesTab = await ensureSheet(sheets, CHANGES_SHEET);
-
-        if (VERBOSE >= 0)
-          console.log(`[Sheets] CHANGES to append: ${changeRows.length}`);
+        if (VERBOSE >= 0) console.log(`[Sheets] CHANGES to append: ${changeRows.length}`);
         await appendRows(sheets, changesTab, changeRows);
-        if (VERBOSE >= 0)
-          console.log(`📝 CHANGES toegevoegd: ${changeRows.length} regels`);
+        if (VERBOSE >= 0) console.log(`📝 CHANGES toegevoegd: ${changeRows.length} regels`);
       }
 
       // MASTER
       const masterOut = Array.from(masterById.values());
-      if (VERBOSE >= 0)
-        console.log(`[Sheets] MASTER to write: ${masterOut.length}`);
+      if (VERBOSE >= 0) console.log(`[Sheets] MASTER to write: ${masterOut.length}`);
       writeCsv("MASTER.csv", masterOut);
       if (sheets) {
         const masterResolved = await ensureSheet(sheets, MASTER_SHEET);
         await clearAndWriteObjects(sheets, masterResolved, masterOut);
+        await applyPlainTextFormatForHeaders(
+          sheets,
+          masterResolved,
+          ["match_id", "grade_id", "status_id", "_grade", "_season", "_hash", "_run_id"]
+        );
         if (VERBOSE >= 0) console.log("📈 MASTER sheet bijgewerkt");
       }
+    } else {
+      // Geen master input -> meld ook 0 changes voor transparantie
+      changeSummary = { created: 0, updated: 0, deleted: 0, total: 0 };
+      await notifyTelegram(`🧾 Run ${runId} • changes: 0 (created 0, updated 0, deleted 0)`);
     }
 
-    // Summary logging
+    // Summary logging (inclusief changeSummary)
     if (sheets) {
       let timestamp = nowIso();
-      let gradeCount = gradesArr.length;
-      let matchCount = totalMatches;
+      const gradeCount = gradesArr.length;
+      const matchCount = totalMatches;
 
-      let tmptext = JSON.stringify([
-        "run started=" + runId,
-        "now=" + timestamp,
-        "script=" + SCRIPT_NAME,
-        "function=main",
-        "action=summary",
-        "table=MASTER",
-        "level=INFO",
-        "version=" + VERSION,
-        "grades=" + gradeCount,
-        "matches=" + matchCount,
-        "errors=" + errorsCount,
+      const tmptext = JSON.stringify([
+        `run started=${runId}`,
+        `now=${timestamp}`,
+        `script=${SCRIPT_NAME}`,
+        `function=main`,
+        `action=summary`,
+        `table=MASTER`,
+        `level=INFO`,
+        `version=${VERSION}`,
+        `grades=${gradeCount}`,
+        `matches=${matchCount}`,
+        `changes=${changeSummary.total}`,
+        `created=${changeSummary.created}`,
+        `updated=${changeSummary.updated}`,
+        `deleted=${changeSummary.deleted}`,
+        `errors=${errorsCount}`,
       ]);
       console.log(tmptext);
       await notifyTelegram(tmptext);
-      await logSummary(
-        sheets,
-        runId,
-        gradesArr.length,
-        totalMatches,
-        errorsCount
-      );
+      await logSummary(sheets, runId, gradeCount, matchCount, errorsCount, changeSummary);
     }
 
     if (VERBOSE >= 1) console.log("\n✅ Klaar!");
@@ -1197,12 +1189,7 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
     } catch {}
   } finally {
     try {
-      // extra zichtbaarheid van “einde” (niet destructief)
-      // NB: versie staat al in RUNS bij start & summary
-      // hier alleen nog een laatste logSummary fallback
-      // (heeft geen effect als sheets niet bestaat).
-      // Je kunt dit ook verwijderen als je het dubbel vindt.
-      // await logSummary(sheets, newRunId(), 0, 0, 0);
+      // no-op
     } catch {}
     if (typeof browser !== "undefined" && browser) {
       await browser.close();
