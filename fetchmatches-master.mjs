@@ -71,14 +71,12 @@ const {
 const SLOWDOWN_MS = Number(process.env.SLOWDOWN_MS ?? 200);
 const TIMEOUT_MS = Number(process.env.PUPPETEER_TIMEOUT_MS ?? 30000);
 const VERBOSE = Number(process.env.VERBOSE ?? 0);
-const DISABLE_SHEETS =
-  String(process.env.DISABLE_SHEETS ?? "").toLowerCase() === "1";
+const DISABLE_SHEETS = String(process.env.DISABLE_SHEETS ?? "").toLowerCase() === "1";
 const RETRY_MAX = Number(process.env.RETRY_MAX ?? 2);
 const RETRY_BASE_DELAY_MS = Number(process.env.RETRY_BASE_DELAY_MS ?? 600);
 const RETRY_JITTER_MS = Number(process.env.RETRY_JITTER_MS ?? 250);
 const REFRESH_REFERRER_EVERY = Number(process.env.REFRESH_REFERRER_EVERY ?? 8);
-const USE_NODE_FETCH_ON_401 =
-  String(process.env.USE_NODE_FETCH_ON_401 ?? "0") === "1";
+const USE_NODE_FETCH_ON_401 = String(process.env.USE_NODE_FETCH_ON_401 ?? "0") === "1";
 const SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
 
 /* ----------------------------
@@ -106,9 +104,7 @@ function pickCiSha() {
 }
 function tryExec(cmd) {
   try {
-    const out = execSync(cmd, { stdio: ["ignore", "pipe", "ignore"] })
-      .toString()
-      .trim();
+    const out = execSync(cmd, { stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
     return out || null;
   } catch {
     return null;
@@ -149,40 +145,14 @@ const HASH_FIELDS = [
 
 const FIELD_ALIASES = {
   match_id: ["match_id", "MatchId", "matchId", "id", "Id", "ID", "match.id"],
-  home_name: [
-    "homeTeam.name",
-    "HomeTeam.name",
-    "home_name",
-    "home",
-    "homeTeamName",
-  ],
-  away_name: [
-    "awayTeam.name",
-    "AwayTeam.name",
-    "away_name",
-    "away",
-    "awayTeamName",
-  ],
+  home_name: ["homeTeam.name", "HomeTeam.name", "home_name", "home", "homeTeamName"],
+  away_name: ["awayTeam.name", "AwayTeam.name", "away_name", "away", "awayTeamName"],
   grade_id: ["gradeId", "grade_id", "grade.id", "_grade", "GradeId"],
   score_text: ["scoreText", "score_text", "score.fullTime", "result_text"],
   round: ["round", "Round", "round_name", "roundName"],
-  date1: [
-    "date1",
-    "matchDate",
-    "MatchDate",
-    "datetime",
-    "start_utc",
-    "startUtc",
-  ],
+  date1: ["date1", "matchDate", "MatchDate", "datetime", "start_utc", "startUtc"],
   leader_text: ["leaderText", "leader_text", "leaders_text", "leadersText"],
-  venue_name: [
-    "venue.name",
-    "Venue.name",
-    "venue_name",
-    "ground",
-    "Ground",
-    "squadName",
-  ],
+  venue_name: ["venue.name", "Venue.name", "venue_name", "ground", "Ground", "squadName"],
   status_id: ["status_id", "statusId", "match_status_id", "matchStatus", "match_status"],
 };
 
@@ -213,9 +183,7 @@ async function notifyTelegram(text) {
 async function getSheetsClient() {
   const impersonate = process.env.GOOGLE_IMPERSONATE_SERVICE_ACCOUNT;
   if (impersonate && impersonate.trim()) {
-    const sourceAuth = new GoogleAuth({
-      scopes: ["https://www.googleapis.com/auth/cloud-platform"],
-    });
+    const sourceAuth = new GoogleAuth({ scopes: ["https://www.googleapis.com/auth/cloud-platform"] });
     const sourceClient = await sourceAuth.getClient();
     const impersonated = new Impersonated({
       sourceClient,
@@ -378,6 +346,17 @@ function extractArray(any) {
     if (arrKey) return any[arrKey];
   }
   return null;
+}
+function writeCsv(filename, rows) {
+  if (!rows?.length) return;
+  try {
+    const fields = uniqueFields(rows);
+    const csv = parse(rows, { fields, defaultValue: "" });
+    fs.writeFileSync(filename, csv, "utf8");
+    if (VERBOSE >= 1) console.log(`💾 ${filename} geschreven (${rows.length} rijen)`);
+  } catch (e) {
+    if (VERBOSE >= 0) console.warn(`⚠️ Kon ${filename} niet schrijven:`, e.message);
+  }
 }
 function pickReferrer() {
   const candidates = [
@@ -576,7 +555,7 @@ function countChanges(changeRows) {
   let changeSummary = { created: 0, updated: 0, deleted: 0, total: 0 };
 
   try {
-    VERSION = resolveCodeVersion("v1.4-telegram-change-count+robust");
+    VERSION = resolveCodeVersion("v1.4-telegram-change-count+fix-writeCsv");
     if (VERBOSE >= 0) console.log(`[Version] running build: ${VERSION}`);
 
     if (!IAS_API_KEY) throw new Error("IAS_API_KEY ontbreekt in .env (X-IAS-API-REQUEST verplicht).");
