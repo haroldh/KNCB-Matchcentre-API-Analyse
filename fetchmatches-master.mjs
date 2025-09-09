@@ -735,6 +735,37 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
 
     if (VERBOSE >= 0) console.log(`[Version] running build: ${VERSION}`);
 
+  // Dump configuratie-variabelen
+  const configDump = {
+    SEASON_ID,
+    RV_ID: process.env.RV_ID,
+    MATCH_REFERRER_URL,
+    GRADES_REFERRER_URL,
+    SEASONS_REFERRER_URL,
+    MATCH_JSON_API_ENDPOINT,
+    GRADES_JSON_API_ENDPOINT,
+    SEASONS_JSON_API_ENDPOINT,
+    SPREADSHEET_ID: SPREADSHEET_ID ? "(set)" : "(not set)",
+    TELEGRAM_BOT_TOKEN: TELEGRAM_BOT_TOKEN ? "(set)" : "(not set)",
+    TELEGRAM_CHAT_ID,
+    IAS_API_KEY: IAS_API_KEY ? "(set)" : "(not set)",
+    VERBOSE,
+    SLOWDOWN_MS,
+    TIMEOUT_MS,
+    RETRY_MAX,
+    RETRY_BASE_DELAY_MS,
+    RETRY_JITTER_MS,
+    REFRESH_REFERRER_EVERY,
+    USE_NODE_FETCH_ON_401,
+    GRADE_IDS,
+    DISABLE_SHEETS,
+    GOOGLE_APPLICATION_CREDENTIALS: process.env.GOOGLE_APPLICATION_CREDENTIALS || "",
+    GOOGLE_IMPERSONATE_SERVICE_ACCOUNT: process.env.GOOGLE_IMPERSONATE_SERVICE_ACCOUNT || ""
+  };
+  console.log("[Config]", JSON.stringify(configDump, null, 2));
+}
+
+
     if (!IAS_API_KEY)
       throw new Error(
         "IAS_API_KEY ontbreekt in .env (X-IAS-API-REQUEST verplicht)."
