@@ -733,7 +733,8 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
   try {
     VERSION = resolveCodeVersion("v1.3-sheets-unformatted-text");
 
-    if (VERBOSE >= 0) console.log(`[Version] running build: ${VERSION}`);
+    if (VERBOSE >= 0) {
+      console.log(`[Version] running build: ${VERSION}`);
 
   // Dump configuratie-variabelen
   const configDump = {
@@ -762,9 +763,8 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
     GOOGLE_APPLICATION_CREDENTIALS: process.env.GOOGLE_APPLICATION_CREDENTIALS || "",
     GOOGLE_IMPERSONATE_SERVICE_ACCOUNT: process.env.GOOGLE_IMPERSONATE_SERVICE_ACCOUNT || ""
   };
-  console.log("[Config]", JSON.stringify(configDump, null, 2));
-}
-
+  console.log("[Config]", JSON.stringify(configDump, null, 2));}
+  }
 
     if (!IAS_API_KEY)
       throw new Error(
