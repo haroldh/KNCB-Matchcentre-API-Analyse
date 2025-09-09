@@ -16,43 +16,6 @@ import { setTimeout as delay } from "node:timers/promises";
 
 dotenv.config();
 
-/* ========= .env =========
-SPREADSHEET_ID=...
-TELEGRAM_BOT_TOKEN=...
-TELEGRAM_CHAT_ID=...
-
-SEASON_ID=19
-RV_ID=134453
-
-// Referrers (sessie/cookies seeden)
-MATCH_REFERRER_URL=https://matchcentre.kncb.nl/matches/
-GRADES_REFERRER_URL=https://matchcentre.kncb.nl/matches/
-SEASONS_REFERRER_URL=https://matchcentre.kncb.nl/seasons/
-
-// JSON endpoints (Resultsvault)
-MATCH_JSON_API_ENDPOINT=https://api.resultsvault.co.uk/rv/134453/matches/?apiid=1002&action=ors&maxrecs=1000&strmflg=1
-GRADES_JSON_API_ENDPOINT=https://api.resultsvault.co.uk/rv/134453/grades/?apiid=1002&seasonid=19
-MATCHSTATUS_JSON_API_ENDPOINT=
-SEASONS_JSON_API_ENDPOINT=https://api.resultsvault.co.uk/rv/134453/seasons/?apiid=1002
-
-// Clubscript-vereiste
-IAS_API_KEY=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-
-// Optioneel gedrag
-SLOWDOWN_MS=200
-PUPPETEER_TIMEOUT_MS=30000
-RETRY_MAX=2
-RETRY_BASE_DELAY_MS=600
-RETRY_JITTER_MS=250
-REFRESH_REFERRER_EVERY=8
-USE_NODE_FETCH_ON_401=0
-VERBOSE=1
-GRADE_IDS=           // optioneel filter, comma-separated
-
-// Sheets via SA of ADC; impersonation optioneel
-GOOGLE_APPLICATION_CREDENTIALS=./credentials.json
-GOOGLE_IMPERSONATE_SERVICE_ACCOUNT=
-========================== */
 
 const {
   MATCH_REFERRER_URL,
@@ -67,7 +30,16 @@ const {
   TELEGRAM_CHAT_ID,
   GRADE_IDS,
   IAS_API_KEY,
+  RV_ID,
+  API_URL,
+  MATCHSTATUS_JSON_API_ENDPOINT,
+  lookupid,
+  CSV_OUTPUT,
+  PUPPETEER_TIMEOUT_MS,
+  GOOGLE_IMPERSONATE_SERVICE_ACCOUNT
 } = process.env;
+
+const IAS_KEY = (process.env.IAS_API_KEY || '').trim();
 
 const SLOWDOWN_MS = Number(process.env.SLOWDOWN_MS ?? 200);
 const TIMEOUT_MS = Number(process.env.PUPPETEER_TIMEOUT_MS ?? 30000);
@@ -477,45 +449,66 @@ function normalizeRvEndpoint(name, value) {
   if (SEASON_ID) u.searchParams.set("seasonid", String(SEASON_ID));
   return u;
 }
+
 function buildMatchUrl(baseUrl, { gradeId, seasonId }) {
   const u = new URL(baseUrl.toString());
-  u.searchParams.delete("gradeid");
-  u.searchParams.delete("seasonId");
-  u.searchParams.delete("seasonid");
-  if (seasonId) u.searchParams.set("seasonid", String(seasonId));
-  else if (SEASON_ID) u.searchParams.set("seasonid", String(SEASON_ID));
-  u.searchParams.set("gradeid", String(gradeId));
-  if (!u.searchParams.has("action")) u.searchParams.set("action", "ors");
-  if (!u.searchParams.has("maxrecs")) u.searchParams.set("maxrecs", "1000");
-  if (!u.searchParams.has("strmflg")) u.searchParams.set("strmflg", "1");
+  // schoonmaken
+  const gidStr = String(gradeId ?? '').replace(/[^\d]+/g, '').trim();
+  if (!gidStr) throw new Error(`Ongeldige gradeId: "${gradeId}"`);
+
+  u.searchParams.delete('gradeid');
+  u.searchParams.delete('seasonId');
+  u.searchParams.delete('seasonid');
+
+  if (seasonId) u.searchParams.set('seasonid', String(seasonId).replace(/[^\d]+/g,''));
+  else if (SEASON_ID) u.searchParams.set('seasonid', String(SEASON_ID).replace(/[^\d]+/g,''));
+
+  u.searchParams.set('gradeid', gidStr);
+  if (!u.searchParams.has('action'))  u.searchParams.set('action', 'ors');
+  if (!u.searchParams.has('maxrecs')) u.searchParams.set('maxrecs', '1000');
+  if (!u.searchParams.has('strmflg')) u.searchParams.set('strmflg', '1');
   return u.toString();
 }
 
+
 function getGradeId(g) {
-  const cands = [
-    g?.gradeId,
-    g?.gradeID,
-    g?.gradeid,
-    g?.grade_id,
-    g?.id,
-    g?.Id,
-    g?.ID,
-    g?.grade?.id,
-    g?.grade?.gradeId,
-    g?.GradeId,
+  const candidates = [
+    g?.gradeId, g?.gradeID, g?.gradeid, g?.grade_id,
+    g?.id, g?.Id, g?.ID,
+    g?.grade?.id, g?.grade?.gradeId,
+    g?.GradeId, g?.GradeID
   ];
-  for (const c of cands) {
-    const n = Number(String(c ?? "").replace(/[^\d]+/g, ""));
-    if (Number.isFinite(n)) return String(n);
+  for (const c of candidates) {
+    if (c == null) continue;
+    const m = String(c).match(/\d+/);        // pak eerste cijferreeks
+    if (!m) continue;
+    const n = parseInt(m[0], 10);
+    if (Number.isFinite(n) && n > 0) return String(n); // alleen >0 toegestaan
   }
-  return "";
+  return null; // expliciet: ongeldig
 }
+
+
 function getSeasonIdFromGrade(g) {
   const cands = [g?.seasonid, g?.seasonId, g?.season?.id];
   for (const c of cands)
     if (c != null && String(c).trim() !== "") return String(c).trim();
   return "";
 }
+
+// Telt created/updated/deleted uit de CHANGES-rows.
+// Verwacht rijen in de vorm: [runId, ts, match_id, change_type, '*', old_hash, new_hash, grade_id]
+function countChanges(changeRows = []) {
+  let created = 0, updated = 0, deleted = 0;
+  for (const r of changeRows) {
+    const t = String(r[3] || '').toLowerCase();
+    if (t === 'created') created++;
+    else if (t === 'updated') updated++;
+    else if (t === 'deleted') deleted++;
+  }
+  return { created, updated, deleted, total: created + updated + deleted };
+}
+
 
 function writeCsv(filename, rows) {
   if (!rows?.length) return;
@@ -577,19 +570,24 @@ function extractHashFieldsFromObj(raw, gradeId) {
    Warm-up per grade
 -----------------------------*/
 async function warmupSession(page, { entityId, gradeId, seasonId }) {
-  const warmUrl = `https://matchcentre.kncb.nl/matches/?entity=${entityId}&grade=${gradeId}&season=${seasonId}`;
+  const gid = String(gradeId ?? '').replace(/[^\d]+/g,'');
+  if (!gid || gid === '0') throw new Error(`warmup: ongeldige gradeId "${gradeId}"`);
+  const sid = String(seasonId ?? SEASON_ID ?? '').replace(/[^\d]+/g,'');
+  const eid = String(entityId ?? process.env.RV_ID ?? '').replace(/[^\d]+/g,'');
+
+  const warmUrl = `https://matchcentre.kncb.nl/matches/?entity=${eid}&grade=${gid}&season=${sid}`;
   try {
     const warm = await page.browser().newPage();
     await warm.setViewport({ width: 160, height: 100 });
     await warm.goto(warmUrl, { waitUntil: "domcontentloaded", timeout: 15000 });
-    await delay(1000);
+    await delay(800);
     await warm.close();
-    if (VERBOSE >= 1) console.log(`🔥 warmup ok for grade ${gradeId}`);
+    if (VERBOSE >= 1) console.log(`🔥 warmup ok for grade ${gid}`);
   } catch (e) {
-    if (VERBOSE >= 0)
-      console.warn(`🔥 warmup failed for grade ${gradeId}: ${e.message}`);
+    if (VERBOSE >= 0) console.warn(`🔥 warmup failed for grade ${gid}: ${e.message}`);
   }
 }
+
 
 /* ----------------------------
    In-page fetch met IAS header + referrer
@@ -601,7 +599,7 @@ async function fetchJsonInPage(page, url, refPageUrl, label) {
         const res = await fetch(u, {
           credentials: "omit",
           referrer: ref,
-          referrerPolicy: "strict-origin-when-cross-origin",
+          referrerPolicy: "origin-when-cross-origin",
           headers: {
             Accept: "application/json",
             "X-IAS-API-REQUEST": ias,
@@ -630,7 +628,7 @@ async function fetchJsonInPage(page, url, refPageUrl, label) {
     },
     url,
     refPageUrl,
-    IAS_API_KEY
+    IAS_KEY
   );
 }
 
@@ -874,27 +872,42 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
     }
 
     // Filter
-    const onlyIds = (GRADE_IDS || "")
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .map(String);
-    if (VERBOSE >= 1) console.log("🔎 Filter GRADE_IDS =", onlyIds);
+// optioneel filter vanuit .env
+const onlyIds = (GRADE_IDS || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean)
+  .map(String);
 
-    const gradesArr = gradesArrRaw.filter((g) => {
-      const gid = getGradeId(g);
-      if (!gid) {
-        if (VERBOSE >= 1) console.log("⚠️ Grade zonder bruikbare id overgeslagen");
-        return false;
-      }
-      return !onlyIds.length || onlyIds.includes(gid);
-    });
-    if (VERBOSE >= 1)
-      console.log(
-        `🧮 Te verwerken grades: ${gradesArr.length}${
-          onlyIds.length ? ` (gefilterd uit ${gradesArrRaw.length})` : ""
-        }`
-      );
+if (VERBOSE >= 1) console.log("🔎 Filter GRADE_IDS =", onlyIds);
+
+// 1) verrijk met gid via getGradeId
+const enriched = gradesArrRaw.map((g) => ({ g, gid: getGradeId(g) }));
+
+// 2) log en filter ongeldige
+const invalid = enriched.filter(({ gid }) => !gid);
+if (invalid.length && VERBOSE >= 1) {
+  console.warn(`⚠️ ${invalid.length} grades zonder geldige id overgeslagen`);
+}
+
+let gradesArr = enriched
+  .filter(({ gid }) => !!gid)                                 // alleen met geldige gid
+  .filter(({ gid }) => !onlyIds.length || onlyIds.includes(gid))
+  .map(({ g }) => g);
+
+// 3) (optioneel) sorteer op numeric gid voor voorspelbare volgorde
+gradesArr = gradesArr.sort((a, b) => {
+  const ga = parseInt(getGradeId(a), 10);
+  const gb = parseInt(getGradeId(b), 10);
+  return ga - gb;
+});
+
+if (VERBOSE >= 1) {
+  console.log(
+    `🧮 Te verwerken grades: ${gradesArr.length}` +
+      (onlyIds.length ? ` (gefilterd uit ${gradesArrRaw.length})` : "")
+  );
+}
 
     const masterRowsRaw = [];
     let processed = 0;
@@ -902,7 +915,12 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
     // 2) Per grade wedstrijden
     for (let i = 0; i < gradesArr.length; i++) {
       const g = gradesArr[i];
-      const gid = getGradeId(g);
+const gid = getGradeId(g);
+if (!gid) {
+  if (VERBOSE >= 0) console.warn("⏭️ Grade zonder geldige id overgeslagen");
+  continue;
+}
+
       const seasonInGrade = getSeasonIdFromGrade(g) || SEASON_ID || "";
 
       if (VERBOSE >= 0)
@@ -923,6 +941,7 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
         seasonId: seasonInGrade || SEASON_ID,
       });
 
+
       const matchUrl = buildMatchUrl(MATCH_URL, {
         gradeId: gid,
         seasonId: seasonInGrade || SEASON_ID,
@@ -939,6 +958,14 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
         matchesJson?.__error &&
         String(matchesJson.__error).includes("HTTP 401")
       ) {
+        console.warn(`[401] url=${matchUrl}`);
+  console.warn(`[401] gid=${gid} | season=${seasonInGrade || SEASON_ID}`);
+  if (matchesJson.__head) console.warn(`[401] head=${matchesJson.__head}`);
+  if (!gid || gid === '0') {
+  console.warn(`⏭️ Skip fetch voor ongeldige gradeId (gid="${gid}")`);
+  continue;
+}
+
         if (VERBOSE >= 1) console.log("🔄 401: nogmaals warm-up en retry…");
         await warmupSession(page, {
           entityId,
@@ -1100,6 +1127,21 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
           });
         }
       }
+
+// --- Nieuw: changes samenvatten en loggen ---
+const ch = countChanges(changeRows);
+const changeMsg = `🧾 Run ${runId} • changes: ${ch.total} (created ${ch.created}, updated ${ch.updated}, deleted ${ch.deleted})`;
+
+// Altijd naar Telegram sturen (ook bij 0 changes)
+await notifyTelegram(changeMsg);
+
+// En een LOG-regel bijschrijven
+if (sheets) {
+  await ensureInfra(sheets); // defensief, geen effect als tabs al bestaan
+  await appendRows(sheets, globalThis.__LOG_NAME__ || 'LOG', [
+    [runId, new Date().toISOString(), SCRIPT_NAME, 'diff', 'changes', 'CHANGES', 'INFO', changeMsg, '']
+  ]);
+}
 
       // CHANGES
       if (sheets && changeRows.length) {
