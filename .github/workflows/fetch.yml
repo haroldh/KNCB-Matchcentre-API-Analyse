@@ -3,7 +3,7 @@ name: Fetch KNCB matches & update Sheets
 on:
   workflow_dispatch: {}
   schedule:
-    - cron: "25 */3 * * *"  # 05:25 UTC (07:25 NL-zomertijd)
+    - cron: "25 */12 * * *"  # 05:25 UTC (07:25 NL-zomertijd)
 
 permissions:
   id-token: write   # nodig voor OIDC/WIF
