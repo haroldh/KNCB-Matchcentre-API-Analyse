@@ -590,8 +590,8 @@ async function warmupSession(page, { entityId, gradeId, seasonId }) {
   const warmUrl = `https://matchcentre.kncb.nl/matches/?entity=${eid}&grade=${gid}&season=${sid}`;
   try {
     const warm = await page.browser().newPage();
-    await warm.setViewport({ width: 160, height: 100 });
-    await warm.goto(warmUrl, { waitUntil: "domcontentloaded", timeout: 15000 });
+    await warm.setViewport({ width: 960, height: 600 });
+    await warm.goto(warmUrl, { waitUntil: "domcontentloaded", timeout: 20000 });
     await delay(800);
     await warm.close();
     if (VERBOSE >= 1) console.log(`🔥 warmup ok for grade ${gid}`);
