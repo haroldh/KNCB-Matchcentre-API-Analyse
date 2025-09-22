@@ -785,7 +785,7 @@ async function logSummary(sheets, runId, gradeCount, matchCount, errors) {
           process.env.GOOGLE_IMPERSONATE_SERVICE_ACCOUNT || "",
       };
       console.log("[Config]", JSON.stringify(configDump, null, 2));
-      await notifyTelegram("[Config]", JSON.stringify(configDump, null, 2));
+      await notifyTelegram("[Config]"+ JSON.stringify(configDump, null, 2));
     }
 
     if (!IAS_API_KEY)
