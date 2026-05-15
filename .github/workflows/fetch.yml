@@ -52,7 +52,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24        #veranderd nvan 20 naar 24
           cache: 'npm'
 
       - name: Auth to Google via OIDC (WIF)
