@@ -55,6 +55,24 @@ jobs:
           node-version: 24        #veranderd nvan 20 naar 24
           cache: 'npm'
 
+  - name: Install dependencies
+    run: npm ci
+
+  - name: Restore Puppeteer cache
+    uses: actions/cache@v4
+    with:
+      path: ~/.cache/puppeteer
+      key: ${{ runner.os }}-puppeteer-${{ hashFiles('package-lock.json') }}
+      restore-keys: |
+        ${{ runner.os }}-puppeteer-
+
+
+  - name: Ensure Puppeteer Chrome is installed
+    run: npx puppeteer browsers install chrome
+
+  - name: Verify Chrome installation
+    run: npx puppeteer browsers list
+
       - name: Auth to Google via OIDC (WIF)
         uses: google-github-actions/auth@v2
         with:
@@ -62,9 +80,6 @@ jobs:
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
           token_format: 'access_token'  # geschikt voor googleapis/google-auth-library
           # audience: optional custom audience
-
-      - name: Install dependencies
-        run: npm ci
 
       - name: Run fetch script
         env:
